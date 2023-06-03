@@ -1,0 +1,63 @@
+#!/usr/bin/env python3
+
+from PyQt5.QtCore import QUrl, QProcess
+from PyQt5.QtGui import QIcon
+from PyQt5.QtWidgets import QApplication, QMainWindow, QVBoxLayout, QWidget, QMessageBox
+from PyQt5.QtWebEngineWidgets import QWebEngineView
+
+import shutil
+import sys
+import tempfile
+import urllib.request
+import webbrowser
+
+
+class QuitDialog:
+    def __init__(self):
+        sys.exit(0)
+
+
+class PythonWebView(QMainWindow):
+    def __init__(self):
+        super().__init__()
+        self.setWindowTitle('Flathub Store')
+        self.setWindowIcon(QIcon('flathub-ui'))
+
+        self.central_widget = QWidget(self)
+        self.setCentralWidget(self.central_widget)
+
+        self.resize(1000, 600)
+
+        self.layout = QVBoxLayout()
+        self.central_widget.setLayout(self.layout)
+
+        self.wview = QWebEngineView(self)
+        self.wview.load(QUrl('https://flathub.org'))
+        self.wview.page().profile().downloadRequested.connect(self.download_requested)
+        self.wview.page().profile().setHttpUserAgent('Mozilla/5.0 (X11; Ubuntu; Linux x86_64; rv:90.0) Gecko/20100101 Firefox/90.0')
+
+        self.layout.addWidget(self.wview)
+
+        self.show()
+
+        self.move(QApplication.desktop().screen().rect().center() - self.rect().center())
+
+    def download_requested(self, download):
+        url = download.url().toString()
+        if url.endswith('.flatpakref'):
+            with urllib.request.urlopen(url) as response, tempfile.NamedTemporaryFile(suffix='.flatpakref', delete=False) as fp:
+                shutil.copyfileobj(response, fp)
+                fp.close()
+                process = QProcess()
+                process.start('x-terminal-emulator', ['-e', 'flatpak', 'install', '-y', '--user', fp.name])
+                process.waitForFinished()
+            download.cancel()
+        elif not url.startswith('https://flathub.org'):
+            webbrowser.open(url, 2)
+            download.cancel()
+
+
+if __name__ == "__main__":
+    app = QApplication(sys.argv)
+    view = PythonWebView()
+    sys.exit(app.exec_())
