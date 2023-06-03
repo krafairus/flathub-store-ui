@@ -12,6 +12,6 @@ Dependencias:
 
 flatpak (sudo apt install flatpak)
 
-python-pyqt5 (sudo apt install python-pyqt5)
-
 python3-pyqt5 (sudo apt install python3-pyqt5)
+
+python3-pyqt5.qtwebengine (sudo apt install python3-pyqt5.qtwebengine)
