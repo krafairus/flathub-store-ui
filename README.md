@@ -9,9 +9,13 @@ version web de flathub instalable que te permite instalar paquetes desde flathub
 Nota: por ahora usa la terminal que tu sistema operativo tenga por predeterminada pero a futuro tengo pensado implementar su propia ventana con la información de la instalación y mas.
 
 Dependencias: 
+(las dependencias se instalan automaticamente usando el paquete que se proporciona en el apartado de "Releases")
 
-flatpak (sudo apt install flatpak)
+Para debian: 
+> ### sudo apt-get install python3-pyqt5 python3-pyqt5.qtwebengine flatpak
 
-python3-pyqt5 (sudo apt install python3-pyqt5)
+Para arch linux ( Tambien para manjaro ):
+> ### sudo pacman -S python python-pyqt5 python-urllib3 python-pyqt5-webengine flatpak
 
-python3-pyqt5.qtwebengine (sudo apt install python3-pyqt5.qtwebengine)
+©krafairus, Todos Los Derechos Reservados. Creado por krafairus.
+Bajo la licencia MIT.
