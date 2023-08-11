@@ -2,7 +2,7 @@
 
 from PyQt5.QtCore import QUrl, QProcess
 from PyQt5.QtGui import QIcon
-from PyQt5.QtWidgets import QApplication, QMainWindow, QVBoxLayout, QWidget, QTextEdit, QPushButton, QDialog, QProgressBar
+from PyQt5.QtWidgets import QApplication, QMainWindow, QVBoxLayout, QWidget, QTextEdit, QPushButton, QDialog, QProgressBar, QMessageBox
 from PyQt5.QtWebEngineWidgets import QWebEngineView
 
 import shutil
@@ -26,7 +26,7 @@ class CommandOutput(QDialog):
 
         # Add a progress bar
         self.progress_bar = QProgressBar(self)
-        self.progress_bar.setRange(0, 0)
+        self.progress_bar.setRange(0, 0)  # Indeterminate progress
         self.layout.addWidget(self.progress_bar)
 
         self.button_force_cancel = QPushButton("Forzar Cancelación De Instalación", self)
@@ -35,8 +35,8 @@ class CommandOutput(QDialog):
 
         self.button_close = QPushButton("Cerrar", self)
         self.button_close.clicked.connect(self.close)
-        self.button_close.setEnabled(False)
-        self.button_close.setVisible(False)
+        self.button_close.setEnabled(False)  # Disable initially
+        self.button_close.setVisible(False)  # Hide initially
         self.layout.addWidget(self.button_close)
 
         self.setLayout(self.layout)
@@ -44,13 +44,19 @@ class CommandOutput(QDialog):
     def append_output(self, text):
         self.text_edit.append(text)
 
+        # Check if the text indicates that the app is already installed
+        if "rama stable ya se encuentra instalada" in text:
+            self.process.kill()  # Stop the process
+            QMessageBox.information(self, "Información", "El programa ya se encuentra instalado.")
+            self.close()
+
     def process_finished(self):
-        self.progress_bar.setRange(0, 100)
+        self.progress_bar.setRange(0, 100)  # Determinate progress
         self.progress_bar.setValue(100)
 
-        self.button_force_cancel.setVisible(False)
-        self.button_close.setEnabled(True)
-        self.button_close.setVisible(True)
+        self.button_force_cancel.setVisible(False)  # Hide
+        self.button_close.setEnabled(True)  # Enable
+        self.button_close.setVisible(True)  # Show
 
     def force_cancel_process(self):
         if self.process:
@@ -91,10 +97,10 @@ class PythonWebView(QMainWindow):
                 fp.close()
 
                 self.process = QProcess()
-                self.process.setProcessChannelMode(QProcess.MergedChannels)
+                self.process.setProcessChannelMode(QProcess.MergedChannels)  # Combine stdout and stderr
 
-                self.output_window = CommandOutput(self)
-                self.output_window.process = self.process
+                self.output_window = CommandOutput(self)  # pass `self` to make it modal
+                self.output_window.process = self.process  # pass the process instance to the CommandOutput
                 self.output_window.show()
 
                 self.process.readyRead.connect(self.read_output)
