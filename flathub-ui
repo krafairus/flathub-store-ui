@@ -2,7 +2,7 @@
 
 from PyQt5.QtCore import QUrl, QProcess
 from PyQt5.QtGui import QIcon
-from PyQt5.QtWidgets import QApplication, QMainWindow, QVBoxLayout, QWidget, QMessageBox
+from PyQt5.QtWidgets import QApplication, QMainWindow, QVBoxLayout, QWidget, QTextEdit, QPushButton, QDialog, QProgressBar
 from PyQt5.QtWebEngineWidgets import QWebEngineView
 
 import shutil
@@ -12,9 +12,50 @@ import urllib.request
 import webbrowser
 
 
-class QuitDialog:
-    def __init__(self):
-        sys.exit(0)
+class CommandOutput(QDialog):
+    def __init__(self, parent=None):
+        super().__init__(parent)
+        self.setWindowTitle('Progreso de instalación del paquete Flatpak')
+        self.resize(600, 400)
+
+        self.layout = QVBoxLayout()
+
+        self.text_edit = QTextEdit(self)
+        self.text_edit.setReadOnly(True)
+        self.layout.addWidget(self.text_edit)
+
+        # Add a progress bar
+        self.progress_bar = QProgressBar(self)
+        self.progress_bar.setRange(0, 0)
+        self.layout.addWidget(self.progress_bar)
+
+        self.button_force_cancel = QPushButton("Forzar Cancelación De Instalación", self)
+        self.button_force_cancel.clicked.connect(self.force_cancel_process)
+        self.layout.addWidget(self.button_force_cancel)
+
+        self.button_close = QPushButton("Cerrar", self)
+        self.button_close.clicked.connect(self.close)
+        self.button_close.setEnabled(False)
+        self.button_close.setVisible(False)
+        self.layout.addWidget(self.button_close)
+
+        self.setLayout(self.layout)
+
+    def append_output(self, text):
+        self.text_edit.append(text)
+
+    def process_finished(self):
+        self.progress_bar.setRange(0, 100)
+        self.progress_bar.setValue(100)
+
+        self.button_force_cancel.setVisible(False)
+        self.button_close.setEnabled(True)
+        self.button_close.setVisible(True)
+
+    def force_cancel_process(self):
+        if self.process:
+            self.process.kill()
+        self.close()
 
 
 class PythonWebView(QMainWindow):
@@ -48,13 +89,26 @@ class PythonWebView(QMainWindow):
             with urllib.request.urlopen(url) as response, tempfile.NamedTemporaryFile(suffix='.flatpakref', delete=False) as fp:
                 shutil.copyfileobj(response, fp)
                 fp.close()
-                process = QProcess()
-                process.start('x-terminal-emulator', ['-e', 'flatpak', 'install', '-y', '--user', fp.name])
-                process.waitForFinished()
-            download.cancel()
+
+                self.process = QProcess()
+                self.process.setProcessChannelMode(QProcess.MergedChannels)
+
+                self.output_window = CommandOutput(self)
+                self.output_window.process = self.process
+                self.output_window.show()
+
+                self.process.readyRead.connect(self.read_output)
+                self.process.finished.connect(self.output_window.process_finished)
+                self.process.start('flatpak', ['install', '-y', '--user', fp.name])
+
+                download.cancel()
         elif not url.startswith('https://flathub.org'):
             webbrowser.open(url, 2)
             download.cancel()
+
+    def read_output(self):
+        text = bytes(self.process.readAll()).decode("utf-8")
+        self.output_window.append_output(text)
 
 
 if __name__ == "__main__":
