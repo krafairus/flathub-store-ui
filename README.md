@@ -14,5 +14,4 @@ Para debian:
 Para arch linux ( Tambien para manjaro ):
 > ### sudo pacman -S python python-pyqt5 python-urllib3 python-pyqt5-webengine flatpak
 
-©krafairus, Todos Los Derechos Reservados. Creado por krafairus.
 Bajo la licencia MIT.
