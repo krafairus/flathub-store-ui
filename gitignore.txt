@@ -12,5 +12,5 @@ dist
 .tar.gz
 *.deb
 .asc
-debian/webapps-creator-ui
+debian/flathub-store-ui
 debian/files
