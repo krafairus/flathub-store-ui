@@ -1,8 +1,0 @@
-[Desktop Entry]
-Name=Flathub Store
-Comment=Tienda Flathub para la instalacion de programas flatpak de forma simple.
-Exec=flathub-ui
-Icon=/usr/share/icons/hicolor/scalable/apps/flathub-ui.svg
-StartupWMClass=flathub-ui
-Type=Application
-Categories=System;
