@@ -18,7 +18,7 @@ clean:
 	rm -f build-stamp
 	dh_clean
 
-DESTDIR = $(CURDIR)/debian/webapps-creator-ui
+DESTDIR = $(CURDIR)/debian/flathub-store-ui
 
 install: build
 	dh_testdir
@@ -26,17 +26,15 @@ install: build
 	dh_prep
 	dh_installdirs
 
-	# Add here commands to install the package into webapps-creator-ui.
-	install -d $(DESTDIR)/usr/bin/webapps-creator-ui
-	install -m 755 webapps-creator-ui $(DESTDIR)/usr/bin/webapps-creator-ui/
-	install -m 755 webapps-creator-ui-wb.py $(DESTDIR)/usr/bin/webapps-creator-ui/
-	install -m 755 webapps-creator-ui.py $(DESTDIR)/usr/bin/webapps-creator-ui/
-	install -d $(DESTDIR)/usr/bin/webapps-creator-ui/languages
-	install -m 644 languages/lg_*.qm $(DESTDIR)/usr/bin/webapps-creator-ui/languages/
+	# Add here commands to install the package into flathub-store-ui.
+	install -d $(DESTDIR)/usr/bin/flathub-store-ui
+	install -m 755 flathub-store-ui $(DESTDIR)/usr/bin
+	install -d $(DESTDIR)/usr/bin/flathub-store-ui/icons
+	install -m 644 icons/*.png $(DESTDIR)/usr/bin/flathub-store-ui/icons
 	install -d $(DESTDIR)/usr/share/applications
-	install -m 644 data/webapps-creator-ui.desktop $(DESTDIR)/usr/share/applications/
+	install -m 644 data/flathub-store-ui.desktop $(DESTDIR)/usr/share/applications/
 	install -d $(DESTDIR)/usr/share/icons/hicolor/scalable/apps
-	install -m 644 data/webapps-creator-ui.svg $(DESTDIR)/usr/share/icons/hicolor/scalable/apps/
+	install -m 644 data/flathub-store-ui.svg $(DESTDIR)/usr/share/icons/hicolor/scalable/apps/
 
 # Build architecture-independent files here.
 binary-indep: build install
