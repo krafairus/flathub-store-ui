@@ -27,10 +27,10 @@ install: build
 	dh_installdirs
 
 	# Add here commands to install the package into flathub-store-ui.
-	install -d $(DESTDIR)/usr/bin/flathub-store-ui
+	install -d $(DESTDIR)/usr/bin
 	install -m 755 flathub-store-ui $(DESTDIR)/usr/bin
-	install -d $(DESTDIR)/usr/bin/flathub-store-ui/icons
-	install -m 644 icons/*.png $(DESTDIR)/usr/bin/flathub-store-ui/icons
+	install -d $(DESTDIR)/usr/bin/flathub-store-ui-files/icons
+	install -m 644 icons/*.png $(DESTDIR)/usr/bin/flathub-store-ui-files/icons
 	install -d $(DESTDIR)/usr/share/applications
 	install -m 644 data/flathub-store-ui.desktop $(DESTDIR)/usr/share/applications/
 	install -d $(DESTDIR)/usr/share/icons/hicolor/scalable/apps

@@ -18,5 +18,4 @@ Depends:
   ${misc:Depends},
   python3,
   ${shlibs:Depends},
-  zenity
 Description: Tienda Flathub para la instalacion de programas flatpak de forma simple.

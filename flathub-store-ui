@@ -196,21 +196,21 @@ class PythonWebView(QMainWindow):
         self.addToolBar(self.toolbar)
 
         # Crear botones para la barra de herramientas
-        self.create_toolbar_button("Inicio", "/usr/bin/flathub-store-ui/icons/home.png", self.go_home)
+        self.create_toolbar_button("Inicio", "/usr/bin/flathub-store-ui-files/icons/home.png", self.go_home)
 
         # Crear botón "Volver"
         self.button_back = QPushButton("Volver")
-        self.button_back.setIcon(QIcon.fromTheme("/usr/bin/flathub-store-ui/icons/back.png"))
+        self.button_back.setIcon(QIcon.fromTheme("/usr/bin/flathub-store-ui-files/icons/back.png"))
         self.button_back.setFixedSize(100, 40)
         self.button_back.clicked.connect(self.go_back)
         self.button_back.setEnabled(False)
         self.toolbar.addWidget(self.button_back)
 
-        self.create_toolbar_button("Apps Instaladas", "/usr/bin/flathub-store-ui/icons/applications.png", self.show_installed_apps)
-        self.create_toolbar_button("Actualizar", "/usr/bin/flathub-store-ui/icons/update.png", self.update_flatpaks)
-        self.create_toolbar_button("Histórico", "/usr/bin/flathub-store-ui/icons/history.png", self.show_history)
-        self.create_toolbar_button("Reparar", "/usr/bin/flathub-store-ui/icons/repair.png", self.repair_flatpak)
-        self.create_toolbar_button("Paquete Local", "/usr/bin/flathub-store-ui/icons/local.png", self.install_local_flatpak)
+        self.create_toolbar_button("Apps Instaladas", "/usr/bin/flathub-store-ui-files/icons/applications.png", self.show_installed_apps)
+        self.create_toolbar_button("Actualizar", "/usr/bin/flathub-store-ui-files/icons/update.png", self.update_flatpaks)
+        self.create_toolbar_button("Histórico", "/usr/bin/flathub-store-ui-files/icons/history.png", self.show_history)
+        self.create_toolbar_button("Reparar", "/usr/bin/flathub-store-ui-files/icons/repair.png", self.repair_flatpak)
+        self.create_toolbar_button("Paquete Local", "/usr/bin/flathub-store-ui-files/icons/local.png", self.install_local_flatpak)
 
         self.wview.urlChanged.connect(self.update_back_button)
 
