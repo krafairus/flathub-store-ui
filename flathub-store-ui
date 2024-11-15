@@ -1,0 +1,352 @@
+#!/usr/bin/env python3
+
+from PyQt5.QtCore import QUrl, QProcess
+from PyQt5.QtGui import QIcon
+from PyQt5.QtWidgets import QApplication, QAction, QMainWindow, QVBoxLayout, QWidget, QSizePolicy, QTextEdit, QPushButton, QDialog, QProgressBar, QMessageBox, QToolBar, QFileDialog, QHBoxLayout, QLabel, QScrollArea, QFrame
+from PyQt5.QtWebEngineWidgets import QWebEngineView
+
+import shutil
+import sys
+import tempfile
+import urllib.request
+import webbrowser
+
+class CommandOutput(QDialog):
+    def __init__(self, title, content, process=None, is_process=False, parent=None):
+        super().__init__(parent)
+        self.setWindowTitle(title)
+        self.resize(600, 400)
+        self.layout = QVBoxLayout()
+        self.text_edit = QTextEdit(self)
+        self.text_edit.setReadOnly(True)
+        self.text_edit.setPlainText(content)
+        self.layout.addWidget(self.text_edit)
+
+        self.is_process = is_process
+        self.process = process
+
+        # Configurar botones según el tipo de ventana
+        if self.is_process and self.process:  # Para ventanas de actualización o reparación
+            self.button_cancel = QPushButton("Cancelar", self)
+            self.button_cancel.clicked.connect(self.cancel_process)
+            self.layout.addWidget(self.button_cancel)
+            self.process.finished.connect(self.on_process_finished)
+        else:  # Para ventanas sin proceso como la de histórico y aplicaciones instaladas
+            self.button_close = QPushButton("Cerrar", self)
+            self.button_close.clicked.connect(self.close)
+            self.layout.addWidget(self.button_close)
+
+        self.button_finish = QPushButton("Finalizar", self)
+        self.button_finish.clicked.connect(self.close)
+        self.button_finish.hide()
+        self.layout.addWidget(self.button_finish)
+
+        self.setLayout(self.layout)
+
+    def cancel_process(self):
+        if self.process:
+            self.process.terminate()
+            self.process.waitForFinished()
+            self.text_edit.append("Proceso cancelado.")
+        self.switch_to_finalize_button()
+
+    def on_process_finished(self):
+        self.switch_to_finalize_button()
+
+    def switch_to_finalize_button(self):
+        if hasattr(self, 'button_cancel'):
+            self.button_cancel.hide()
+        self.button_finish.show()
+
+class InstalledAppsDialog(QDialog):
+    def __init__(self, parent=None):
+        super().__init__(parent)
+        self.setWindowTitle('Aplicaciones Flatpak Instaladas')
+        self.resize(650, 450)
+
+        self.layout = QVBoxLayout()
+
+        self.scroll_area = QScrollArea(self)
+        self.scroll_area.setWidgetResizable(True)
+
+        self.scroll_content = QWidget(self.scroll_area)
+        self.scroll_layout = QVBoxLayout(self.scroll_content)
+
+        self.scroll_content.setLayout(self.scroll_layout)
+        self.scroll_area.setWidget(self.scroll_content)
+
+        self.layout.addWidget(self.scroll_area)
+
+        self.button_close = QPushButton("Cerrar", self)
+        self.button_close.clicked.connect(self.close)
+        self.layout.addWidget(self.button_close)
+
+        self.setLayout(self.layout)
+
+    def load_installed_apps(self):
+        process = QProcess()
+        process.start("flatpak", ["list", "--columns=application"])
+        process.waitForFinished()
+        output = process.readAll().data().decode().strip().splitlines()
+
+        for app_name in output:
+            app_layout = QHBoxLayout()
+
+            app_label = QLabel(app_name)
+            app_label.setWordWrap(True)
+
+            uninstall_button = QPushButton("Desinstalar")
+            uninstall_button.setFixedSize(100, 30)
+            uninstall_button.clicked.connect(lambda _, name=app_name: self.uninstall_app(name))
+
+            info_button = QPushButton("Información")
+            info_button.setFixedSize(100, 30)
+            info_button.clicked.connect(lambda _, name=app_name: self.show_app_info(name))
+
+            app_layout.addWidget(app_label)
+            app_layout.addWidget(uninstall_button)
+            app_layout.addWidget(info_button)
+
+            frame = QFrame(self)
+            frame.setLayout(app_layout)
+            self.scroll_layout.addWidget(frame)
+
+    def uninstall_app(self, app_name):
+        self.uninstall_process = QProcess()
+        self.output_window = CommandOutput("Desinstalando...", "", self)
+        self.output_window.show()
+
+        self.uninstall_process.setProcessChannelMode(QProcess.MergedChannels)
+        self.uninstall_process.readyRead.connect(lambda: self.output_window.text_edit.append(self.uninstall_process.readAll().data().decode()))
+        self.uninstall_process.finished.connect(self.output_window.close)
+        self.uninstall_process.start("flatpak", ["uninstall", "-y", app_name])
+
+    def show_app_info(self, app_name):
+        info_process = QProcess()
+        info_process.start("flatpak", ["info", app_name])
+        info_process.waitForFinished()
+        info_output = info_process.readAll().data().decode()
+
+        # Usar solo el botón de "Cerrar"
+        info_window = CommandOutput(f'Información de {app_name}', info_output, parent=self)
+        info_window.setWindowModality(True)
+        info_window.show()
+
+class RepairProgressDialog(QDialog):
+    def __init__(self, parent=None):
+        super().__init__(parent)
+        self.setWindowTitle('Reparación de Flatpak')
+        self.resize(600, 450)
+
+        self.layout = QVBoxLayout(self)
+
+        self.progress_bar = QProgressBar(self)
+        self.layout.addWidget(self.progress_bar)
+
+        self.text_edit = QTextEdit(self)
+        self.text_edit.setReadOnly(True)
+        self.layout.addWidget(self.text_edit)
+
+        # Inicialmente mostrar el botón de Cancelar y ocultar el de Finalizar
+        self.button_cancel = QPushButton("Cancelar", self)
+        self.button_cancel.clicked.connect(self.cancel_repair_process)
+        self.layout.addWidget(self.button_cancel)
+
+        self.button_finalize = QPushButton("Finalizar", self)
+        self.button_finalize.clicked.connect(self.close)
+        self.button_finalize.hide()
+        self.layout.addWidget(self.button_finalize)
+
+        self.repair_process = None
+        self.setLayout(self.layout)
+
+    def set_repair_process(self, process):
+        self.repair_process = process
+
+    def cancel_repair_process(self):
+        if self.repair_process:
+            self.repair_process.terminate()
+            self.repair_process.waitForFinished()
+            self.text_edit.append("Reparación cancelada.")
+        self.switch_to_finalize_button()
+
+    def switch_to_finalize_button(self):
+        self.button_cancel.hide()
+        self.button_finalize.show()
+
+# Ventana principal de la aplicación
+class PythonWebView(QMainWindow):
+    def __init__(self):
+        super().__init__()
+        self.setWindowTitle('Flathub Store')
+        self.setWindowIcon(QIcon('flathub-ui'))
+        self.resize(1000, 600)
+
+        self.central_widget = QWidget(self)
+        self.setCentralWidget(self.central_widget)
+        self.layout = QVBoxLayout()
+        self.central_widget.setLayout(self.layout)
+
+        self.wview = QWebEngineView(self)
+        self.wview.load(QUrl('https://flathub.org/es'))
+        self.wview.page().profile().downloadRequested.connect(self.download_requested)
+        self.layout.addWidget(self.wview)
+
+        self.toolbar = QToolBar("Main Toolbar", self)
+        self.addToolBar(self.toolbar)
+
+        # Crear botones para la barra de herramientas
+        self.create_toolbar_button("Inicio", "/home/brandon/Desktop/Pv/flathub-store-ui_1.4.2_amd64/usr/bin/flathub-store-ui/icons/home.png", self.go_home)
+
+        # Crear botón "Volver"
+        self.button_back = QPushButton("Volver")
+        self.button_back.setIcon(QIcon.fromTheme("/home/brandon/Desktop/Pv/flathub-store-ui_1.4.2_amd64/usr/bin/flathub-store-ui/icons/back.png"))
+        self.button_back.setFixedSize(100, 40)
+        self.button_back.clicked.connect(self.go_back)
+        self.button_back.setEnabled(False)
+        self.toolbar.addWidget(self.button_back)
+
+        self.create_toolbar_button("Apps Instaladas", "/home/brandon/Desktop/Pv/flathub-store-ui_1.4.2_amd64/usr/bin/flathub-store-ui/icons/applications.png", self.show_installed_apps)
+        self.create_toolbar_button("Actualizar", "/home/brandon/Desktop/Pv/flathub-store-ui_1.4.2_amd64/usr/bin/flathub-store-ui/icons/update.png", self.update_flatpaks)
+        self.create_toolbar_button("Histórico", "/home/brandon/Desktop/Pv/flathub-store-ui_1.4.2_amd64/usr/bin/flathub-store-ui/icons/history.png", self.show_history)
+        self.create_toolbar_button("Reparar", "/home/brandon/Desktop/Pv/flathub-store-ui_1.4.2_amd64/usr/bin/flathub-store-ui/icons/repair.png", self.repair_flatpak)
+        self.create_toolbar_button("Paquete Local", "/home/brandon/Desktop/Pv/flathub-store-ui_1.4.2_amd64/usr/bin/flathub-store-ui/icons/local.png", self.install_local_flatpak)
+
+        self.wview.urlChanged.connect(self.update_back_button)
+
+        # Obtener y mostrar la versión de Flatpak en la barra de herramientas
+        self.flatpak_version = self.get_flatpak_version()
+        self.version_label = QLabel(f'Versión de Flatpak: {self.flatpak_version}', self)
+
+        spacer = QWidget()
+        spacer.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Preferred)
+
+        self.toolbar.addWidget(spacer)
+        self.toolbar.addWidget(self.version_label)
+
+        self.show()
+
+    def create_toolbar_button(self, text, icon_name, slot):
+        button = QPushButton(text)
+        button.setIcon(QIcon.fromTheme(icon_name))
+        button.setFixedSize(100, 40)
+        button.clicked.connect(slot)
+
+        self.toolbar.addWidget(button)
+        return button
+
+    def create_toolbar_button_with_icon(self, name, icon_path, function):
+        action = QAction(QIcon(icon_path), name, self)
+        action.triggered.connect(function)
+
+        # Añadir la acción a la barra de herramientas
+        self.toolbar.addAction(action)
+
+    def get_flatpak_version(self):
+        process = QProcess()
+        process.start("flatpak", ["--version"])
+        process.waitForFinished()
+        version = process.readAll().data().decode().strip()
+        return version
+
+    def update_back_button(self, url):
+        self.button_back.setEnabled(self.wview.history().canGoBack() and url.toString() != 'https://flathub.org/es')
+
+    def go_home(self):
+        self.wview.load(QUrl('https://flathub.org/es'))
+        self.button_back.setEnabled(False)
+
+    def go_back(self):
+        if self.wview.history().canGoBack():
+            self.wview.back()
+            self.button_back.setEnabled(self.wview.url().toString() != 'https://flathub.org/es')
+        else:
+            self.button_back.setEnabled(False)
+
+    def show_installed_apps(self):
+        self.installed_apps_dialog = InstalledAppsDialog(self)
+        self.installed_apps_dialog.load_installed_apps()
+        self.installed_apps_dialog.show()
+
+    def update_flatpaks(self):
+        self.update_process = QProcess()
+        self.output_window = CommandOutput("Actualización en progreso...", "", process=self.update_process, is_process=True, parent=self)
+        self.output_window.show()
+
+        self.update_process.setProcessChannelMode(QProcess.MergedChannels)
+        self.update_process.readyRead.connect(lambda: self.output_window.text_edit.append(self.update_process.readAll().data().decode()))
+        self.update_process.finished.connect(self.output_window.on_process_finished)
+        self.update_process.start("flatpak", ["update", "-y"])
+
+    def show_history(self):
+        process = QProcess()
+        process.start("flatpak", ["history"])
+        process.waitForFinished()
+        history_output = process.readAll().data().decode()
+
+        self.history_window = CommandOutput("Histórico de Operaciones", history_output, parent=self)
+        self.history_window.show()
+
+    def repair_flatpak(self):
+        self.repair_process = QProcess()
+        self.output_window = CommandOutput("Reparación en progreso...", "", process=self.repair_process, is_process=True, parent=self)
+        self.output_window.show()
+
+        self.repair_process.setProcessChannelMode(QProcess.MergedChannels)
+        self.repair_process.readyRead.connect(lambda: self.output_window.text_edit.append(self.repair_process.readAll().data().decode()))
+        self.repair_process.finished.connect(self.output_window.on_process_finished)
+        self.repair_process.start("flatpak", ["repair"])
+
+    def install_local_flatpak(self):
+        # Abrir diálogo de selección de archivo
+        file_dialog = QFileDialog(self)
+        file_dialog.setNameFilter("Flatpakref files (*.flatpakref)")
+        file_dialog.setFileMode(QFileDialog.ExistingFile)
+
+        if file_dialog.exec_():
+            flatpakref_path = file_dialog.selectedFiles()[0]
+
+            # Configurar el proceso de instalación y la ventana de salida
+            self.local_install_process = QProcess()
+            self.output_window = CommandOutput("Instalación de Flatpak en progreso...", "", process=self.local_install_process, is_process=True, parent=self)
+            self.output_window.show()
+
+            # Configurar salida del proceso e iniciar la instalación
+            self.local_install_process.setProcessChannelMode(QProcess.MergedChannels)
+            self.local_install_process.readyRead.connect(lambda: self.output_window.text_edit.append(self.local_install_process.readAll().data().decode()))
+            self.local_install_process.finished.connect(self.output_window.on_process_finished)
+            self.local_install_process.start('flatpak', ['install', '-y', '--user', flatpakref_path])
+
+    def download_requested(self, download):
+        url = download.url().toString()
+        if url.endswith('.flatpakref'):
+            with urllib.request.urlopen(url) as response, tempfile.NamedTemporaryFile(suffix='.flatpakref', delete=False) as fp:
+                shutil.copyfileobj(response, fp)
+                fp.close()
+
+                # Crear proceso de instalación con la ventana de salida correspondiente
+                self.process = QProcess()
+                self.output_window = CommandOutput("Instalación de Flatpak en progreso...", "", process=self.process, is_process=True, parent=self)
+                self.output_window.show()
+
+                # Configurar salida del proceso e iniciar la instalación
+                self.process.setProcessChannelMode(QProcess.MergedChannels)
+                self.process.readyRead.connect(lambda: self.output_window.text_edit.append(self.process.readAll().data().decode()))
+                self.process.finished.connect(self.output_window.on_process_finished)
+                self.process.start('flatpak', ['install', '-y', '--user', fp.name])
+
+                # Cancelar la descarga en el navegador ya que se maneja en la app
+                download.cancel()
+        elif not url.startswith('https://flathub.org/es'):
+            webbrowser.open(url, 2)
+            download.cancel()
+
+    def read_output(self):
+        text = bytes(self.process.readAll()).decode("utf-8")
+        self.output_window.append_output(text)
+
+
+if __name__ == "__main__":
+    app = QApplication(sys.argv)
+    view = PythonWebView()
+    sys.exit(app.exec_())
