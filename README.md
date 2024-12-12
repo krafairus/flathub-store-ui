@@ -1,4 +1,4 @@
-# Flathub Store UI
+# Flathub Store UI - AI
 
 ![386462424-4e4815b1-cdb6-40c2-8f5a-790583e672bc](https://github.com/user-attachments/assets/d373ebab-e7e5-419d-8205-7e9a748314db)
 
