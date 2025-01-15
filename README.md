@@ -30,3 +30,5 @@ Para arch linux ( Tambien para manjaro ):
 > ### sudo pacman -S python python-pyqt5 python-urllib3 python-pyqt5-webengine flatpak
 
 Bajo la licencia MIT.
+Under the MIT license.
+Thanks to the incredible deepin community in Spanish. https://github.com/deepin-espanol/
