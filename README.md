@@ -1,6 +1,6 @@
 # Flathub Store UI - ai
 
-![Screenshot_20250115_175424](https://github.com/user-attachments/assets/7f4130da-1fe3-480b-8c04-852412e0e98d)
+![Captura de pantalla_20250201_162555](https://github.com/user-attachments/assets/b6a37301-3733-4b2c-98b3-76378523fab8)
 
 ## English
 **Installable Web Version of Flathub**  
