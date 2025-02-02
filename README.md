@@ -1,4 +1,4 @@
-# Flathub Store UI - ai
+# Flathub Store UI
 
 ![Captura de pantalla_20250201_162826](https://github.com/user-attachments/assets/f0369d44-7a67-4516-83e8-6c630309d99e)
 
