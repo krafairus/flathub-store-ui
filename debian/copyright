@@ -4,7 +4,7 @@ Upstream-Contact: krafairus <krafairuspc@gmail.com>
 Source: https://github.com/krafairus/flathub-store-ui
 
 Files: *
-Copyright: 2023-2024 krafairus <krafairuspc@gmail.com>
+Copyright: 2023-2025 krafairus <krafairuspc@gmail.com>
 License: MIT
  Permission is hereby granted, free of charge, to any person obtaining a copy
  of this software and associated documentation files (the "Software"), to deal
@@ -25,5 +25,5 @@ License: MIT
  THE SOFTWARE.
 
 Files: debian/*
-Copyright: 2024 krafairus <krafairuspc@gmail.com>
+Copyright: 2025 krafairus <krafairuspc@gmail.com>
 License: OSL-3.0

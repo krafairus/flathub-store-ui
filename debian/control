@@ -4,18 +4,13 @@ Priority: optional
 Maintainer: krafairus <krafairuspc@gmail.com>
 Uploaders:
   krafairus <krafairuspc@gmail.com>
-Build-Depends:
-  debhelper-compat (= 13)
+Build-Depends: debhelper (= 13), debhelper-compat (= 13), dh-python, python3-all, pyqt5-dev-tools
 Standards-Version: 4.5.0
 Homepage: https://github.com/krafairus/flathub-store-ui
 
 Package: flathub-store-ui
 Architecture: all
-Depends:
-  flatpak,
-  python3-pyqt5,
-  python3-pyqt5.qtwebengine,
-  ${misc:Depends},
-  python3,
-  ${shlibs:Depends},
-Description: Tienda Flathub para la instalacion de programas flatpak de forma simple.
+Depends: ${python3:Depends}, ${misc:Depends}, python3-pyqt5, python3-pyqt5.qtwebengine, flatpak, python3-requests
+Description: Interfaz gráfica para gestionar aplicaciones Flatpak
+ Flathub Store UI es una aplicación gráfica para gestionar aplicaciones Flatpak.
+ Proporciona una interfaz amigable para instalar, actualizar y desinstalar aplicaciones Flatpak.
