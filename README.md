@@ -15,8 +15,6 @@ For Debian:
 For Arch Linux (also for Manjaro):  
 > ### sudo pacman -S python python-pyqt5 python-urllib3 python-pyqt5-webengine flatpak
 
-Licensed under the MIT License.
-
 ## Spanish
 Version Web de Flathub instalable que te permite instalar paquetes desde flathub con solo tocar el boton de instalar sin tener que bajar el archivo y instalarlo manual, solo con unos clicks y sin residuos, funciona en deepin os, debian, ubuntu, arch linux y manjaro, fuera de esas distros o basadas no doy soporte y no espere respuesta aunque seria facil portarlo a otros paquetes.
 
@@ -29,6 +27,5 @@ Para debian:
 Para arch linux ( Tambien para manjaro ):
 > ### sudo pacman -S python python-pyqt5 python-urllib3 python-pyqt5-webengine flatpak
 
-Bajo la licencia MIT.
 Under the MIT license.
 Thanks to the incredible deepin community in Spanish. https://github.com/deepin-espanol/
