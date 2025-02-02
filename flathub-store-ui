@@ -58,8 +58,7 @@ class CommandOutput(QDialog):
         self.button_finish.hide()
         self.layout.addWidget(self.button_finish)
 
-        # Configurar botones según el tipo de ventana
-        if self.is_process and self.process:  # Para ventanas de actualización o reparación
+        if self.is_process and self.process:  
             self.button_cancel = QPushButton(self.tr("Cancelar"), self)
             self.button_cancel.setStyleSheet("""
                 QPushButton {
@@ -76,7 +75,7 @@ class CommandOutput(QDialog):
             self.button_cancel.clicked.connect(self.cancel_process)
             self.layout.addWidget(self.button_cancel)
             self.process.finished.connect(self.on_process_finished)
-        else:  # Para ventanas sin proceso como la de histórico y aplicaciones instaladas
+        else: # Si no es un proceso, mostrar solo el botón de "Cerrar"
             self.button_close = QPushButton(self.tr("Cerrar"), self)
             self.button_close.setStyleSheet("""
                 QPushButton {
@@ -156,7 +155,6 @@ class InstalledAppsDialog(QDialog):
         for app_name in output:
             app_layout = QHBoxLayout()
 
-            # Crear un QFrame con borde redondeado para cada aplicación
             frame = QFrame(self)
             frame.setStyleSheet("QFrame { border-radius: 10px; background-color: #f0f0f0; padding: 10px; margin-bottom: 10px; }")
             frame.setLayout(app_layout)
@@ -459,7 +457,7 @@ class PythonWebView(QMainWindow):
         self.toolbar = QToolBar("Main Toolbar", self)
         self.addToolBar(self.toolbar)
 
-        self.toolbar.setMovable(False)  # Esto evitará que la barra de herramientas se mueva
+        self.toolbar.setMovable(False)  
 
         # Crear botones para la barra de herramientas
         self.create_icon_button(
@@ -490,7 +488,6 @@ class PythonWebView(QMainWindow):
         
         self.wview.urlChanged.connect(self.update_back_button)
 
-        # Obtener y mostrar la versión de Flatpak en la barra de herramientas
         self.flatpak_version = self.get_flatpak_version()
         self.version_label = QLabel(f'Flatpak: {self.flatpak_version}', self)
 
@@ -507,9 +504,6 @@ class PythonWebView(QMainWindow):
         about_window.show()
 
     def create_icon_button(self, tooltip, icon_path, slot, enable=True):
-        """
-        Crea un botón con solo un ícono en la barra de herramientas.
-        """
         button = QPushButton()
         button.setIcon(QIcon(icon_path))
         button.setToolTip(tooltip)  # Mostrar el nombre al pasar el cursor
@@ -527,8 +521,7 @@ class PythonWebView(QMainWindow):
         process.waitForFinished()
         version = process.readAll().data().decode().strip()
         
-        # Filtrar el texto para dejar solo el número de la versión
-        version_number = version.replace("Flatpak", "").strip()  # Eliminar "flatpak" y limpiar espacios
+        version_number = version.replace("Flatpak", "").strip()
         
         return version_number
 
@@ -581,7 +574,6 @@ class PythonWebView(QMainWindow):
         self.repair_process.start("flatpak", ["repair"])
 
     def install_local_flatpak(self):
-        # Abrir diálogo de selección de archivo
         file_dialog = QFileDialog(self)
         file_dialog.setNameFilter("Flatpakref files (*.flatpakref)")
         file_dialog.setFileMode(QFileDialog.ExistingFile)
@@ -589,12 +581,10 @@ class PythonWebView(QMainWindow):
         if file_dialog.exec_():
             flatpakref_path = file_dialog.selectedFiles()[0]
 
-            # Configurar el proceso de instalación y la ventana de salida
             self.local_install_process = QProcess()
             self.output_window = CommandOutput(self.tr("Instalación de Flatpak en progreso..."), "", process=self.local_install_process, is_process=True, parent=self)
             self.output_window.show()
 
-            # Configurar salida del proceso e iniciar la instalación
             self.local_install_process.setProcessChannelMode(QProcess.MergedChannels)
             self.local_install_process.readyRead.connect(lambda: self.output_window.text_edit.append(self.local_install_process.readAll().data().decode()))
             self.local_install_process.finished.connect(self.output_window.on_process_finished)
@@ -607,18 +597,15 @@ class PythonWebView(QMainWindow):
                 shutil.copyfileobj(response, fp)
                 fp.close()
 
-                # Crear proceso de instalación con la ventana de salida correspondiente
                 self.process = QProcess()
                 self.output_window = CommandOutput(self.tr("Instalación de Flatpak en progreso..."), "", process=self.process, is_process=True, parent=self)
                 self.output_window.show()
 
-                # Configurar salida del proceso e iniciar la instalación
                 self.process.setProcessChannelMode(QProcess.MergedChannels)
                 self.process.readyRead.connect(lambda: self.output_window.text_edit.append(self.process.readAll().data().decode()))
                 self.process.finished.connect(self.output_window.on_process_finished)
                 self.process.start('flatpak', ['install', '-y', '--user', fp.name])
 
-                # Cancelar la descarga en el navegador ya que se maneja en la app
                 download.cancel()
         elif not url.startswith('https://flathub.org/es'):
             webbrowser.open(url, 2)
