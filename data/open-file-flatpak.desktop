@@ -1,11 +1,16 @@
 [Desktop Entry]
+Encoding=UTF-8
+Keywords=package;installer;flatpak;
 Name=Instalar Paquete Flatpak
+GenericName=Instalar Paquete Flatpak
 Name[en]=Install Flatpak Package
-Comment=Instalador de archivos Flatpak (.flatpakref)
-Exec=/usr/bin/python3 /usr/share/flahub-store-ui/open-file-flatpak %f
+Comment=Remover o instalar paquetes flatpakref.
+Exec=/usr/bin/python3 /usr/share/flathub-store-ui/open-file-flatpak %F
 Icon=/usr/share/icons/hicolor/scalable/apps/flathub-store-ui.svg
 Type=Application
 MimeType=application/vnd.flatpak.ref;
 Terminal=false
 Categories=Utility;System;
 NoDisplay=true
+X-DFM-MenuTypes=SingleFile;
+X-KDE-Protocols=file
