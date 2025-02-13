@@ -1,645 +1,78 @@
 #!/usr/bin/env python3
 
-from PyQt5.QtCore import QUrl, QProcess, QTranslator, QLocale, QDir
-from PyQt5.QtGui import QIcon
-from PyQt5.QtWidgets import QApplication, QMainWindow, QVBoxLayout, QWidget, QSizePolicy, QTextEdit, QPushButton, QDialog, QToolBar, QFileDialog, QHBoxLayout, QLabel, QScrollArea, QFrame
-from PyQt5.QtWebEngineWidgets import QWebEngineView
-
-import shutil
 import sys
-import tempfile
-import urllib.request
-import webbrowser
+import os
 import json
-import sys
+import subprocess
+from PyQt5.QtWidgets import QApplication, QDialog, QVBoxLayout, QPushButton, QLabel, QMessageBox
+from PyQt5.QtGui import QIcon
 
-def get_user_language():
-    locale = QLocale.system().name()
-    return locale
-
-class CommandOutput(QDialog):
-    def __init__(self, title, content, process=None, is_process=False, parent=None):
-        super().__init__(parent)
-        self.setWindowTitle(title)
-        self.resize(650, 400)
-        self.layout = QVBoxLayout()
-
-        # Crear un frame para darle bordes redondeados y fondo
-        frame = QFrame(self)
-
-        # Configurar el QTextEdit para que se vea más limpio
-        self.text_edit = QTextEdit(self)
-        self.text_edit.setReadOnly(True)
-        self.text_edit.setPlainText(content)
-
-        # Añadir el QTextEdit al frame
-        frame_layout = QVBoxLayout(frame)
-        frame_layout.addWidget(self.text_edit)
-
-        self.layout.addWidget(frame)
-
-        self.is_process = is_process
-        self.process = process
-
-        self.button_finish = QPushButton(self.tr("Finalizar"), self)
-        self.button_finish.setStyleSheet("""
-            QPushButton {
-                background-color: #4CAF50;
-                border-radius: 8px;
-                color: white;
-                font-weight: bold;
-                padding: 5px 15px;
-            }
-            QPushButton:hover {
-                background-color: #45a049;
-            }
-        """)
-        self.button_finish.clicked.connect(self.close)
-        self.button_finish.hide()
-        self.layout.addWidget(self.button_finish)
-
-        if self.is_process and self.process:  
-            self.button_cancel = QPushButton(self.tr("Cancelar"), self)
-            self.button_cancel.setStyleSheet("""
-                QPushButton {
-                    background-color: #FF5C5C;
-                    border-radius: 8px;
-                    color: white;
-                    font-weight: bold;
-                    padding: 5px 15px;
-                }
-                QPushButton:hover {
-                    background-color: #FF2D2D;
-                }
-            """)
-            self.button_cancel.clicked.connect(self.cancel_process)
-            self.layout.addWidget(self.button_cancel)
-            self.process.finished.connect(self.on_process_finished)
-        else: # Si no es un proceso, mostrar solo el botón de "Cerrar"
-            self.button_close = QPushButton(self.tr("Cerrar"), self)
-            self.button_close.setStyleSheet("""
-                QPushButton {
-                    background-color: #4CAF50;
-                    border-radius: 8px;
-                    color: white;
-                    font-weight: bold;
-                    padding: 5px 15px;
-                }
-                QPushButton:hover {
-                    background-color: #45a049;
-                }
-            """)
-            self.button_close.clicked.connect(self.close)
-            self.layout.addWidget(self.button_close)
-
-        self.setLayout(self.layout)
-
-    def cancel_process(self):
-        if self.process:
-            self.process.terminate()
-            self.process.waitForFinished()
-            self.text_edit.append(self.tr("Proceso cancelado."))
-        self.switch_to_finalize_button()
-
-    def on_process_finished(self):
-        self.switch_to_finalize_button()
-
-    def switch_to_finalize_button(self):
-        if hasattr(self, 'button_cancel'):
-            self.button_cancel.hide()
-        self.button_finish.show()
-
-class InstalledAppsDialog(QDialog):
-    def __init__(self, parent=None):
-        super().__init__(parent)
-        self.setWindowTitle(self.tr('Aplicaciones Flatpak Instaladas'))
-        self.resize(650, 450)
-
-        self.layout = QVBoxLayout()
-
-        self.scroll_area = QScrollArea(self)
-        self.scroll_area.setWidgetResizable(True)
-
-        self.scroll_content = QWidget(self.scroll_area)
-        self.scroll_layout = QVBoxLayout(self.scroll_content)
-
-        self.scroll_content.setLayout(self.scroll_layout)
-        self.scroll_area.setWidget(self.scroll_content)
-
-        self.layout.addWidget(self.scroll_area)
-
-        self.button_close = QPushButton("Cerrar", self)
-        self.button_close.setStyleSheet("""
-            QPushButton {
-                background-color: #4CAF50;
-                border-radius: 8px;
-                color: white;
-                font-weight: bold;
-                padding: 5px 15px;
-            }
-            QPushButton:hover {
-                background-color: #45a049;
-            }
-        """)
-        self.button_close.clicked.connect(self.close)
-        self.layout.addWidget(self.button_close)
-
-        self.setLayout(self.layout)
-
-    def load_installed_apps(self):
-        process = QProcess()
-        process.start("flatpak", ["list", "--columns=application"])
-        process.waitForFinished()
-        output = process.readAll().data().decode().strip().splitlines()
-
-        for app_name in output:
-            app_layout = QHBoxLayout()
-
-            frame = QFrame(self)
-            frame.setStyleSheet("QFrame { border-radius: 10px; background-color: #f0f0f0; padding: 10px; margin-bottom: 10px; }")
-            frame.setLayout(app_layout)
-
-            app_label = QLabel(app_name)
-            app_label.setStyleSheet("QLabel { font-size: 14px; font-weight: bold; color: #333; }")
-            app_label.setWordWrap(True)
-
-            uninstall_button = QPushButton(self.tr("Desinstalar"))
-            uninstall_button.setFixedSize(100, 30)
-            uninstall_button.setStyleSheet("QPushButton { background-color: #d9534f; color: white; border-radius: 5px; padding: 5px; font-size: 12px; }")
-            uninstall_button.clicked.connect(lambda _, name=app_name: self.uninstall_app(name))
-
-            info_button = QPushButton(self.tr("Información"))
-            info_button.setFixedSize(100, 30)
-            info_button.setStyleSheet("QPushButton { background-color: #5bc0de; color: white; border-radius: 5px; padding: 5px; font-size: 12px; }")
-            info_button.clicked.connect(lambda _, name=app_name: self.show_app_info(name))
-
-            # Agregar widgets al layout de la aplicación
-            app_layout.addWidget(app_label)
-            app_layout.addWidget(uninstall_button)
-            app_layout.addWidget(info_button)
-
-            # Agregar el QFrame al layout principal
-            self.scroll_layout.addWidget(frame)
-
-    def uninstall_app(self, app_name):
-        self.uninstall_process = QProcess()
-        self.output_window = CommandOutput(self.tr("Desinstalando..."), "", self)
-        self.output_window.show()
-
-        self.uninstall_process.setProcessChannelMode(QProcess.MergedChannels)
-        self.uninstall_process.readyRead.connect(lambda: self.output_window.text_edit.append(self.uninstall_process.readAll().data().decode()))
-        self.uninstall_process.finished.connect(self.output_window.close)
-        self.uninstall_process.start("flatpak", ["uninstall", "-y", app_name])
-
-    def show_app_info(self, app_name):
-        info_process = QProcess()
-        info_process.start("flatpak", ["info", app_name])
-        info_process.waitForFinished()
-        info_output = info_process.readAll().data().decode()
-
-        # Usar solo el botón de "Cerrar"
-        info_window = CommandOutput(f'App {app_name}', info_output, parent=self)
-        info_window.setWindowModality(True)
-        info_window.show()
-
-class RepairProgressDialog(QDialog):
-    def __init__(self, parent=None):
-        super().__init__(parent)
-        self.setWindowTitle(self.tr('Reparación de Flatpak'))
-        self.resize(600, 450)
-
-        self.layout = QVBoxLayout(self)
-
-        self.progress_bar = QProgressBar(self)
-        self.layout.addWidget(self.progress_bar)
-
-        self.text_edit = QTextEdit(self)
-        self.text_edit.setReadOnly(True)
-        self.layout.addWidget(self.text_edit)
-
-        # Inicialmente mostrar el botón de Cancelar y ocultar el de Finalizar
-        self.button_cancel = QPushButton(self.tr("Cancelar"), self)
-        self.button_cancel.setStyleSheet("""
-            QPushButton {
-                background-color: #FF5C5C;
-                border-radius: 8px;
-                color: white;
-                font-weight: bold;
-                padding: 5px 15px;
-            }
-            QPushButton:hover {
-                background-color: #FF2D2D;
-            }
-        """)
-        self.button_cancel.clicked.connect(self.cancel_repair_process)
-        self.layout.addWidget(self.button_cancel)
-
-        self.button_finalize = QPushButton(self.tr("Finalizar"), self)
-        self.button_finalize.setStyleSheet("""
-            QPushButton {
-                background-color: #4CAF50;
-                border-radius: 8px;
-                color: white;
-                font-weight: bold;
-                padding: 5px 15px;
-            }
-            QPushButton:hover {
-                background-color: #45a049;
-            }
-        """)
-        self.button_finalize.clicked.connect(self.close)
-        self.button_finalize.hide()
-        self.layout.addWidget(self.button_finalize)
-
-        self.repair_process = None
-        self.setLayout(self.layout)
-
-    def set_repair_process(self, process):
-        self.repair_process = process
-
-    def cancel_repair_process(self):
-        if self.repair_process:
-            self.repair_process.terminate()
-            self.repair_process.waitForFinished()
-            self.text_edit.append(self.tr("Reparación cancelada."))
-        self.switch_to_finalize_button()
-
-    def switch_to_finalize_button(self):
-        self.button_cancel.hide()
-        self.button_cancel.setStyleSheet("""
-            QPushButton {
-                background-color: #FF5C5C;
-                border-radius: 8px;
-                color: white;
-                font-weight: bold;
-                padding: 5px 15px;
-            }
-            QPushButton:hover {
-                background-color: #FF2D2D;
-            }
-        """)
-        self.button_finalize.show()
-
-class AboutDialog(QDialog):
-    def __init__(self, parent=None):
-        super().__init__(parent)
-        self.setWindowTitle(self.tr('Acerca de'))
-        self.resize(300, 60)
-
-        layout = QVBoxLayout()
-
-        # Información de Flatpak
-        flatpak_version = self.get_flatpak_version()
-        flatpak_label = QLabel(self.tr(f'Flatpak Versión: {flatpak_version}'))
-        layout.addWidget(flatpak_label)
-
-        # Cantidad de aplicaciones instaladas
-        app_count = self.get_installed_app_count()
-        app_count_label = QLabel(self.tr(f'Apps instaladas: {app_count}'))
-        layout.addWidget(app_count_label)
-
-        # Información sobre el creador
-        creator_label = QLabel(self.tr('Desarrollado por krafairus'))
-        version_label = QLabel(self.tr('Versión de la app: 1.5.2'))
-        url_label = QLabel(self.tr('URL: https://www.github.com/krafairus'))
-        
-        layout.addWidget(creator_label)
-        layout.addWidget(version_label)
-        layout.addWidget(url_label)
-
-        # Botón para cerrar
-        close_button = QPushButton(self.tr("Cerrar"))
-        close_button.setStyleSheet("""
-            QPushButton {
-                background-color: #4CAF50;
-                border-radius: 8px;
-                color: white;
-                font-weight: bold;
-                padding: 5px 15px;
-            }
-            QPushButton:hover {
-                background-color: #45a049;
-            }
-        """)
-        close_button.clicked.connect(self.close)
-        layout.addWidget(close_button)
-
-        self.setLayout(layout)
-
-    def get_flatpak_version(self):
-        process = QProcess()
-        process.start("flatpak", ["--version"])
-        process.waitForFinished()
-        version = process.readAll().data().decode().strip()
-        return version
-
-    def get_installed_app_count(self):
-        process = QProcess()
-        process.start("flatpak", ["list", "--columns=application"])
-        process.waitForFinished()
-        output = process.readAll().data().decode().strip().splitlines()
-        return len(output)
-
-# Ventana principal de la aplicación
-class PythonWebView(QMainWindow):
+class LanguageSelector(QDialog):
     def __init__(self):
         super().__init__()
-        self.setWindowTitle('Flathub Store')
-        self.setWindowIcon(QIcon('flathub-store-ui'))
-        self.resize(1000, 600)
+        self.setWindowTitle("Seleccionar Idioma")
+        self.setFixedSize(300, 200)
+        self.setWindowIcon(QIcon('/usr/share/icons/hicolor/scalable/apps/flathub-store-ui'))
 
-        self.central_widget = QWidget(self)
-        self.setCentralWidget(self.central_widget)
         self.layout = QVBoxLayout()
-        self.central_widget.setLayout(self.layout)
 
-        self.wview = QWebEngineView(self)
-        settings = self.wview.settings()
-        self.wview.load(QUrl('https://flathub.org/es'))
-        self.wview.page().profile().downloadRequested.connect(self.download_requested)
-        self.layout.addWidget(self.wview)
+        self.label = QLabel("Por favor, seleccione un idioma: ")
+        self.layout.addWidget(self.label)
 
-        # Bandera para verificar si la barra de herramientas ya fue creada
-        self.toolbar_created = False
+        self.button_english = QPushButton("English")
+        self.button_english.clicked.connect(lambda: self.select_language("en"))
+        self.layout.addWidget(self.button_english)
 
-        # Crear la barra de herramientas y los botones
-        self.create_toolbar()
+        self.button_spanish = QPushButton("Español")
+        self.button_spanish.clicked.connect(lambda: self.select_language("es"))
+        self.layout.addWidget(self.button_spanish)
 
-        # Inyectar CSS personalizado cuando la página termine de cargar
-        self.wview.page().loadFinished.connect(self.inject_custom_css)
+        self.button_portuguese = QPushButton("Português")
+        self.button_portuguese.clicked.connect(lambda: self.select_language("pt"))
+        self.layout.addWidget(self.button_portuguese)
 
-    def inject_custom_css(self):
-        """
-        Inyecta CSS personalizado para corregir el botón.
-        """
-        custom_css = """
+        self.setLayout(self.layout)
 
-        /* Estilos para el campo de búsqueda */
-        #search {
-            background-color: #ffffff !important; /* Fondo blanco */
-            border: 2px solid #45a049 !important; /* Borde verde */
-            border-radius: 25px !important; /* Bordes redondeados */
-            padding: 10px 40px 10px 40px !important; /* Espaciado interno */
-            font-size: 16px !important; /* Tamaño de fuente */
-            color: #333333 !important; /* Color del texto */
-            outline: none !important; /* Eliminar el contorno al enfocar */
-            transition: border-color 0.3s ease !important; /* Transición suave */
-        }
+    def select_language(self, language_code):
+        config_path = os.path.expanduser("~/.flathubui-config/config.json")
+        config_dir = os.path.dirname(config_path)
 
-        /* Estilos para el campo de búsqueda al enfocar */
-        #search:focus {
-            border-color: #45a049 !important; /* Borde verde más intenso */
-            box-shadow: 0 0 5px rgba(69, 160, 73, 0.5) !important; /* Sombra al enfocar */
-        }
+        if not os.path.exists(config_dir):
+            os.makedirs(config_dir)
 
-        /* Estilos para el ícono de búsqueda */
-        .relative .absolute svg {
-            color: #45a049 !important; /* Color verde para el ícono */
-        }
+        config = {"language": language_code}
+        with open(config_path, "w") as config_file:
+            json.dump(config, config_file)
 
-        /* Estilos para el botón de búsqueda */
-        .relative .absolute button {
-            background-color: transparent !important; /* Fondo transparente */
-            border: none !important; /* Sin borde */
-            cursor: pointer !important; /* Cursor de puntero */
-        }
+        QMessageBox.information(self, "Idioma seleccionado", f"Idioma seleccionado: {language_code}")
+        self.close()
 
-        /* Estilos para el botón de búsqueda al pasar el cursor */
-        .relative .absolute button:hover {
-            background-color: rgba(69, 160, 73, 0.1) !important; /* Fondo verde claro */
-        }
+        try:
+            subprocess.run(["/usr/share/flathub-store-ui/flathub-store-ui"], check=True)
+        except subprocess.CalledProcessError as e:
+            QMessageBox.critical(self, "Error", f"El programa principal falló: {e}")
+        finally:
+            sys.exit(0) 
 
-        /* Estilos para el texto de placeholder */
-        #search::placeholder {
-            color: #999999 !important; /* Color gris para el placeholder */
-        }
-
-        /* Estilos para el botón específico */
-        .bg-flathub-celestial-blue {
-            background-color: #45a049 !important; /* Color azul */
-            color: white !important; /* Texto blanco */
-            border-radius: 8px !important; /* Bordes redondeados */
-            padding: 10px 20px !important; /* Espaciado interno */
-            font-size: 16px !important; /* Tamaño de fuente */
-            font-weight: bold !important; /* Texto en negrita */
-            border: none !important; /* Sin borde */
-            cursor: pointer !important; /* Cursor de puntero */
-            text-align: center !important; /* Texto centrado */
-            text-decoration: none !important; /* Sin subrayado */
-            display: inline-block !important; /* Mostrar como bloque en línea */
-            transition: background-color 0.3s ease !important; /* Transición suave */
-        }
-
-        /* Estilos para el hover (cuando el cursor está sobre el botón) */
-        .bg-flathub-celestial-blue:hover {
-            background-color: #4CAF50 !important; /* Color azul más oscuro */
-        }
-
-        /* Estilos para el active (cuando el botón está siendo clickeado) */
-        .bg-flathub-celestial-blue:active {
-            background-color: #004080 !important; /* Color azul aún más oscuro */
-        }
-        """
-        self.wview.page().runJavaScript(f"""
-            var style = document.createElement('style');
-            style.type = 'text/css';
-            style.innerHTML = `{custom_css}`;
-            document.head.appendChild(style);
-        """)
-
-    def create_toolbar(self):
-        """
-        Crea la barra de herramientas y los botones (solo una vez).
-        """
-        if self.toolbar_created:
-            return  # Si ya se creó, no hacer nada
-        
-        self.toolbar = QToolBar("Main Toolbar", self)
-        self.addToolBar(self.toolbar)
-
-        self.toolbar.setMovable(False)  
-
-        # Crear botones para la barra de herramientas
-        self.create_icon_button(
-            self.tr("Inicio flathub"), 
-                    "/usr/bin/flathub-store-ui-files/icons/home.png", 
-                    self.go_home)
-        self.button_back = self.create_icon_button(
-            self.tr("Volver"), 
-            "/usr/bin/flathub-store-ui-files/icons/back.png", self.go_back, enable=False)
-        self.create_icon_button(
-            self.tr("Gestionar apps"), 
-            "/usr/bin/flathub-store-ui-files/icons/applications.png", self.show_installed_apps)
-        self.create_icon_button(
-            self.tr("Actualizar Apps"), 
-            "/usr/bin/flathub-store-ui-files/icons/update.png", self.update_flatpaks)
-        self.create_icon_button(
-            self.tr("Historial de cambios"), 
-            "/usr/bin/flathub-store-ui-files/icons/history.png", self.show_history)
-        self.create_icon_button(
-            self.tr("Reparar Paquetes"), 
-            "/usr/bin/flathub-store-ui-files/icons/repair.png", self.repair_flatpak)
-        self.create_icon_button(
-            self.tr("Instalar .flatpak"), 
-            "/usr/bin/flathub-store-ui-files/icons/local.png", self.install_local_flatpak)
-        self.create_icon_button(
-            self.tr("Acerca de"), 
-            "/usr/bin/flathub-store-ui-files/icons/about.png", self.show_about)
-        
-        self.wview.urlChanged.connect(self.update_back_button)
-
-        self.flatpak_version = self.get_flatpak_version()
-        self.version_label = QLabel(f'Flatpak: {self.flatpak_version}', self)
-
-        spacer = QWidget()
-        spacer.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Preferred)
-
-        self.toolbar.addWidget(spacer)
-        self.toolbar.addWidget(self.version_label)
-
-        self.show()
-
-    def show_about(self):
-        about_window = AboutDialog(self)
-        about_window.show()
-
-    def create_icon_button(self, tooltip, icon_path, slot, enable=True):
-        button = QPushButton()
-        button.setIcon(QIcon(icon_path))
-        button.setToolTip(tooltip)  # Mostrar el nombre al pasar el cursor
-        button.setFixedSize(40, 40)  # Tamaño fijo del botón
-        button.clicked.connect(slot)
-        button.setEnabled(enable)
-
-        self.toolbar.addWidget(button)
-        return button
-
-
-    def get_flatpak_version(self):
-        process = QProcess()
-        process.start("flatpak", ["--version"])
-        process.waitForFinished()
-        version = process.readAll().data().decode().strip()
-        
-        version_number = version.replace("Flatpak", "").strip()
-        
-        return version_number
-
-    def update_back_button(self, url):
-        self.button_back.setEnabled(self.wview.history().canGoBack() and url.toString() != 'https://flathub.org/es')
-
-    def go_home(self):
-        self.wview.load(QUrl('https://flathub.org/es'))
-        self.button_back.setEnabled(False)
-
-    def go_back(self):
-        if self.wview.history().canGoBack():
-            self.wview.back()
-            self.button_back.setEnabled(self.wview.url().toString() != 'https://flathub.org/es')
-        else:
-            self.button_back.setEnabled(False)
-
-    def show_installed_apps(self):
-        self.installed_apps_dialog = InstalledAppsDialog(self)
-        self.installed_apps_dialog.load_installed_apps()
-        self.installed_apps_dialog.show()
-
-    def update_flatpaks(self):
-        self.update_process = QProcess()
-        self.output_window = CommandOutput(self.tr("Actualización en progreso..."), "", process=self.update_process, is_process=True, parent=self)
-        self.output_window.show()
-
-        self.update_process.setProcessChannelMode(QProcess.MergedChannels)
-        self.update_process.readyRead.connect(lambda: self.output_window.text_edit.append(self.update_process.readAll().data().decode()))
-        self.update_process.finished.connect(self.output_window.on_process_finished)
-        self.update_process.start("flatpak", ["update", "-y"])
-
-    def show_history(self):
-        process = QProcess()
-        process.start("flatpak", ["history"])
-        process.waitForFinished()
-        history_output = process.readAll().data().decode()
-
-        self.history_window = CommandOutput(self.tr("Histórico de Operaciones"), history_output, parent=self)
-        self.history_window.show()
-
-    def repair_flatpak(self):
-        self.repair_process = QProcess()
-        self.output_window = CommandOutput(self.tr("Reparación en progreso..."), "", process=self.repair_process, is_process=True, parent=self)
-        self.output_window.show()
-
-        self.repair_process.setProcessChannelMode(QProcess.MergedChannels)
-        self.repair_process.readyRead.connect(lambda: self.output_window.text_edit.append(self.repair_process.readAll().data().decode()))
-        self.repair_process.finished.connect(self.output_window.on_process_finished)
-        self.repair_process.start("flatpak", ["repair"])
-
-    def install_local_flatpak(self):
-        file_dialog = QFileDialog(self)
-        file_dialog.setNameFilter("Flatpakref files (*.flatpakref)")
-        file_dialog.setFileMode(QFileDialog.ExistingFile)
-
-        if file_dialog.exec_():
-            flatpakref_path = file_dialog.selectedFiles()[0]
-
-            self.local_install_process = QProcess()
-            self.output_window = CommandOutput(self.tr("Instalación de Flatpak en progreso..."), "", process=self.local_install_process, is_process=True, parent=self)
-            self.output_window.show()
-
-            self.local_install_process.setProcessChannelMode(QProcess.MergedChannels)
-            self.local_install_process.readyRead.connect(lambda: self.output_window.text_edit.append(self.local_install_process.readAll().data().decode()))
-            self.local_install_process.finished.connect(self.output_window.on_process_finished)
-            self.local_install_process.start('flatpak', ['install', '-y', '--user', flatpakref_path])
-
-    def download_requested(self, download):
-        url = download.url().toString()
-        if url.endswith('.flatpakref'):
-            with urllib.request.urlopen(url) as response, tempfile.NamedTemporaryFile(suffix='.flatpakref', delete=False) as fp:
-                shutil.copyfileobj(response, fp)
-                fp.close()
-
-                self.process = QProcess()
-                self.output_window = CommandOutput(self.tr("Instalación de Flatpak en progreso..."), "", process=self.process, is_process=True, parent=self)
-                self.output_window.show()
-
-                self.process.setProcessChannelMode(QProcess.MergedChannels)
-                self.process.readyRead.connect(lambda: self.output_window.text_edit.append(self.process.readAll().data().decode()))
-                self.process.finished.connect(self.output_window.on_process_finished)
-                self.process.start('flatpak', ['install', '-y', '--user', fp.name])
-
-                download.cancel()
-        elif not url.startswith('https://flathub.org/es'):
-            webbrowser.open(url, 2)
-            download.cancel()
-
-    def read_output(self):
-        text = bytes(self.process.readAll()).decode("utf-8")
-        self.output_window.append_output(text)
-
-def load_language_config():
-    config_path = QDir.homePath() + "/.flathubui-config/config.json"
-    try:
-        with open(config_path, "r") as config_file:
-            config = json.load(config_file)
-            return config.get("language", "en")  # Idioma por defecto: inglés
-    except (FileNotFoundError, json.JSONDecodeError):
-        print("No se pudo cargar el archivo de configuración. Usando idioma predeterminado.")
-        return "en"
-
-def load_translation(app, language_code):
-    translator = QTranslator()
-    locale_file = f"translations_{language_code}.qm"
-    if translator.load(locale_file):
-        app.installTranslator(translator)
-        print(f"Traducción cargada: {locale_file}")
-    else:
-        print(f"Error: No se encontró el archivo de traducción para {language_code}.")
-
-if __name__ == "__main__":
+def main():
     app = QApplication(sys.argv)
 
-    user_language = get_user_language()
-    load_translation(app, user_language)
+    config_path = os.path.expanduser("~/.flathubui-config/config.json")
+    if os.path.exists(config_path):
+        with open(config_path, "r") as config_file:
+            config = json.load(config_file)
+            if "language" in config:
+                try:
+                    subprocess.run(["/usr/share/flathub-store-ui/flathub-store-ui"], check=True)
+                except subprocess.CalledProcessError as e:
+                    QMessageBox.critical(None, "Error", f"El programa principal falló: {e}")
+                finally:
+                    sys.exit(0)  
 
-    main_window = PythonWebView()
-    main_window.show()
+    selector = LanguageSelector()
+    selector.exec_()
+
     sys.exit(app.exec_())
+
+if __name__ == "__main__":
+    main()

@@ -1,0 +1,515 @@
+import sys
+import json
+import os
+import signal
+from PyQt5.QtWidgets import (
+    QApplication, QWidget, QVBoxLayout, QLabel, QPushButton, QProgressBar, QScrollArea, QMessageBox, QHBoxLayout, QDialog, QTextEdit, QFrame, QFileDialog
+)
+from PyQt5.QtCore import QProcess, Qt, QDir, QTranslator
+from PyQt5.QtGui import QIcon
+
+translation_path = "/usr/share/flathub-store-ui/translations"
+
+class GPGKeyDialog(QDialog):
+    def __init__(self, gpg_key, parent=None):
+        super().__init__(parent)
+        self.setWindowTitle(self.tr("Clave GPG"))
+        self.setFixedSize(400, 300)
+        self.setWindowIcon(QIcon('/usr/share/icons/hicolor/scalable/apps/flathub-store-ui'))
+
+        layout = QVBoxLayout(self)
+
+        self.text_edit = QTextEdit(self)
+        self.text_edit.setPlainText(gpg_key)
+        self.text_edit.setReadOnly(True)
+        layout.addWidget(self.text_edit)
+
+        button_container = QWidget(self)
+        button_layout = QHBoxLayout(button_container)
+
+        button_layout.addStretch()
+
+        close_button = QPushButton(self.tr("Cerrar"), self)
+        close_button.setFixedSize(100, 30)
+        close_button.setStyleSheet("""
+            QPushButton {
+                background-color: #4CAF50;
+                border-radius: 8px;
+                color: white;
+                font-weight: bold;
+                padding: 5px 15px;
+            }
+            QPushButton:hover {
+                background-color: #45a049;
+            }
+        """)
+        close_button.clicked.connect(self.close)
+        button_layout.addWidget(close_button)
+
+        layout.addWidget(button_container)
+
+
+class FlatpakInstaller(QWidget):
+    def __init__(self, flatpakref_file=None):
+        super().__init__()
+        self.flatpakref_file = flatpakref_file
+        self.process = QProcess()
+        self.package_installed = False
+        self.initUI()
+
+    def closeEvent(self, event):
+        self.stop_process()
+        self.kill_child_processes() 
+        self.terminate_python_process() 
+        event.accept()
+
+    def stop_process(self):
+        if self.process.state() == QProcess.Running:
+            print("Deteniendo el proceso en segundo plano...")
+            self.process.terminate() 
+            if not self.process.waitForFinished(2000): 
+                print("Forzando la terminación del proceso...")
+                self.process.kill() 
+                self.process.waitForFinished() 
+
+    def kill_child_processes(self):
+        if self.process.state() == QProcess.Running:
+            try:
+                parent_pid = self.process.processId()
+
+                for proc in os.listdir("/proc"):
+                    if proc.isdigit():  
+                        try:
+                            with open(f"/proc/{proc}/status", "r") as status_file:
+                                status = status_file.read()
+
+                            if f"PPid:\t{parent_pid}" in status:
+                                print(f"Matando subproceso: PID {proc}")
+                                os.kill(int(proc), signal.SIGKILL)
+                        except (FileNotFoundError, PermissionError, ValueError):
+                            continue
+            except Exception as e:
+                print(f"Error al matar subprocesos: {e}")
+
+    def terminate_python_process(self):
+        print("Forzando la terminación del proceso de Python...")
+        os.kill(os.getpid(), signal.SIGTERM) 
+
+    def cancel_installation(self):
+        self.stop_process() 
+        self.kill_child_processes() 
+        self.terminate_python_process()  
+        self.close()
+
+    def initUI(self):
+        self.setWindowTitle(self.tr('Instalador de Flatpak')) 
+        self.setMinimumSize(400, 400)
+        self.setWindowIcon(QIcon('/usr/share/icons/hicolor/scalable/apps/flathub-store-ui'))
+
+        self.setWindowFlags(Qt.FramelessWindowHint)
+
+        main_layout = QVBoxLayout(self)
+        main_layout.setContentsMargins(0, 0, 0, 0)
+
+        self.create_custom_title_bar(main_layout)
+
+        language = self.load_language_config()
+        self.load_translations(language)
+
+        if not self.flatpakref_file:
+            self.flatpakref_file = self.open_file_dialog()
+
+        if not self.flatpakref_file:
+            QMessageBox.warning(self, self.tr("Error"), self.tr("No se seleccionó ningún archivo."))
+            sys.exit(1)
+
+        self.package_info = self.read_flatpakref()
+
+        self.package_installed = self.is_package_installed()
+
+        self.scroll_area = QScrollArea(self)
+        self.scroll_area.setWidgetResizable(True)
+
+        self.info_widget = QWidget()
+        self.info_layout = QVBoxLayout(self.info_widget)
+
+        if self.package_installed:
+            warning_container = QFrame(self)
+            warning_container.setFrameShape(QFrame.StyledPanel)
+            warning_container.setStyleSheet("background-color: #FF2D2D; color: #CADFE5; border-radius: 5px; padding: 10px;")
+
+            warning_layout = QVBoxLayout(warning_container)
+            warning_label = QLabel(self.tr("¡Advertencia! Este paquete ya está instalado."))
+            warning_label.setWordWrap(True)
+            warning_layout.addWidget(warning_label)
+            self.info_layout.addWidget(warning_container)
+
+        translations = {
+            "Name": self.tr("Nombre"),
+            "Title": self.tr("Titulo del paquete"),
+            "Branch": self.tr("Rama"),
+            "Url": self.tr("URL del repositorio"),
+            "SuggestRemoteName": self.tr("Nombre del repositorio"),
+            "IsRuntime": self.tr("Es un runtime"),
+            "RuntimeRepo": self.tr("Obtenido desde")
+        }
+
+        self.info_containers = []
+        for key, value in self.package_info.items():
+            if key != "GPGKey":  
+                translated_key = translations.get(key, key) 
+                container = QFrame(self)
+                container.setFrameShape(QFrame.StyledPanel)
+                container.setStyleSheet("background-color: #333333; color: #CADFE5; border-radius: 5px; padding: 10px;")
+
+                container_layout = QVBoxLayout(container)
+                label = QLabel(f"<b>{translated_key}:</b> {value}")
+                label.setWordWrap(True)  
+                container_layout.addWidget(label)
+                self.info_layout.addWidget(container)
+                self.info_containers.append(container)
+
+        self.scroll_area.setWidget(self.info_widget)
+        main_layout.addWidget(self.scroll_area)
+
+        self.button_frame = QFrame(self)
+        button_layout = QHBoxLayout(self.button_frame)
+
+        self.gpg_button = QPushButton(self.tr('Clave GPG'), self) 
+        self.gpg_button.setFixedSize(100, 30)
+        self.gpg_button.setStyleSheet("""
+            QPushButton {
+                background-color: #4CAF50;
+                border-radius: 8px;
+                color: white;
+                font-weight: bold;
+                padding: 5px 15px;
+            }
+            QPushButton:hover {
+                background-color: #45a049;
+            }
+        """)
+        self.gpg_button.clicked.connect(self.show_gpg_key)
+        button_layout.addWidget(self.gpg_button, alignment=Qt.AlignLeft)
+
+        button_layout.addStretch()
+
+        self.cancel_button = QPushButton(self.tr('Cancelar'), self) 
+        self.cancel_button.setFixedSize(100, 30)
+        self.cancel_button.setStyleSheet("""
+            QPushButton {
+                background-color: #FF5C5C;
+                border-radius: 8px;
+                color: white;
+                font-weight: bold;
+                padding: 5px 15px;
+            }
+            QPushButton:hover {
+                background-color: #FF2D2D;
+            }
+        """)
+        self.cancel_button.clicked.connect(self.cancel_installation)
+        button_layout.addWidget(self.cancel_button)
+
+        if self.package_installed:
+            self.install_button = QPushButton(self.tr('Desinstalar'), self)  
+            self.install_button.setFixedSize(100, 30)
+            self.install_button.setStyleSheet("""
+            QPushButton {
+                background-color: #d9534f;  
+                border-radius: 8px;
+                color: white;
+                font-size: 12px;
+                font-weight: bold;
+                padding: 5px 15px;
+            }
+            QPushButton:hover {
+                background-color: #993e3b;  
+            }
+        """)
+            self.install_button.clicked.connect(self.start_uninstallation)
+        else:
+            self.install_button = QPushButton(self.tr('Instalar'), self)  
+            self.install_button.setFixedSize(100, 30)
+            self.install_button.setStyleSheet("""
+            QPushButton {
+                background-color: #66b3ff;  
+                border-radius: 8px;
+                color: white;
+                font-size: 12px;
+                font-weight: bold;
+                padding: 5px 15px;
+            }
+            QPushButton:hover {
+                background-color: #88a9b4;  
+            }
+        """)
+            self.install_button.clicked.connect(self.start_installation)
+        button_layout.addWidget(self.install_button)
+
+        main_layout.addWidget(self.button_frame)
+
+        self.progress_bar = QProgressBar(self)
+        self.progress_bar.setVisible(False)
+        main_layout.addWidget(self.progress_bar)
+
+        self.install_output = QTextEdit(self)
+        self.install_output.setReadOnly(True)
+        self.install_output.setVisible(False)
+        main_layout.addWidget(self.install_output)
+
+    def create_custom_title_bar(self, main_layout):
+        """Crea una barra de título personalizada."""
+        self.title_bar = QWidget(self)
+        self.title_bar.setFixedHeight(40)  
+        self.title_bar.setObjectName("title_bar")  
+        self.title_bar.setStyleSheet("background-color: #262626; border-bottom: 1px solid #333333;")
+
+        title_layout = QHBoxLayout(self.title_bar)
+        title_layout.setContentsMargins(10, 0, 10, 0)
+        title_layout.setSpacing(0)
+
+        title_layout.addStretch()
+
+        minimize_button = QPushButton("─")
+        minimize_button.setFixedSize(40, 40)
+        minimize_button.setStyleSheet("""
+            QPushButton {
+                background-color: transparent;
+                color: #BEBEBE;
+                font-size: 16px;
+                border: none; /* Eliminar borde */
+                border-radius: 0px; /* Eliminar bordes redondeados */
+            }
+            QPushButton:hover {
+                background-color: #4A4A4A;
+            }
+            QPushButton:pressed {
+                background-color: #323232;
+            }
+        """)
+        minimize_button.clicked.connect(self.showMinimized)
+        title_layout.addWidget(minimize_button)
+
+        close_button = QPushButton("✕")
+        close_button.setFixedSize(40, 40)
+        close_button.setStyleSheet("""
+            QPushButton {
+                background-color: transparent;
+                color: #BEBEBE;
+                font-size: 16px;
+                border: none; /* Eliminar borde */
+                border-radius: 0px; /* Eliminar bordes redondeados */
+            }
+            QPushButton:hover {
+                background-color: #4A4A4A;
+            }
+            QPushButton:pressed {
+                background-color: #323232;
+            }
+        """)
+        close_button.clicked.connect(self.close)
+        title_layout.addWidget(close_button)
+
+        main_layout.addWidget(self.title_bar)
+
+    def mousePressEvent(self, event):
+        if event.button() == Qt.LeftButton and self.title_bar.underMouse():
+            self.dragging = True
+            self.offset = event.globalPos() - self.pos()
+
+    def mouseMoveEvent(self, event):
+        if self.dragging:
+            self.move(event.globalPos() - self.offset)
+
+    def mouseReleaseEvent(self, event):
+        if event.button() == Qt.LeftButton:
+            self.dragging = False
+
+    def mouseDoubleClickEvent(self, event):
+        if event.button() == Qt.LeftButton and self.title_bar.underMouse():
+            if self.isMaximized():
+                self.showNormal()
+            else:
+                self.showMaximized()
+
+    def load_language_config(self):
+        config_path = QDir.homePath() + "/.flathubui-config/config.json"
+        try:
+            with open(config_path, "r") as config_file:
+                config = json.load(config_file)
+                return config.get("language", "es")
+        except (FileNotFoundError, json.JSONDecodeError):
+            print(self.tr("No se pudo cargar el archivo de configuración. Usando idioma predeterminado."))
+            return "en"
+
+    def load_translations(self, language, translation_path=""):
+        translator = QTranslator(self)
+
+        locale_file = f"{translation_path}/ts_open-file-flatpak_{language}.qm"
+
+        if translator.load(locale_file):
+            QApplication.instance().installTranslator(translator)
+            print(self.tr(f"Traducción cargada para el idioma: {language}"))
+        else:
+            print(self.tr(f"No se pudo cargar la traducción para el idioma: {language} en la ruta: {translation_path}"))
+
+    def open_file_dialog(self):
+        file_dialog = QFileDialog(self)
+        file_dialog.setWindowTitle(self.tr("Seleccionar archivo .flatpakref"))
+        file_dialog.setNameFilter(self.tr("Archivos Flatpak (*.flatpakref)"))
+        file_dialog.setFileMode(QFileDialog.ExistingFile)
+
+        if file_dialog.exec_():
+            selected_files = file_dialog.selectedFiles()
+            if selected_files:
+                return selected_files[0]  
+        return None
+
+    def is_package_installed(self):
+        package_name = self.package_info.get("Name", "")  
+        if not package_name:
+            return False
+
+        process = QProcess(self)
+        process.start("flatpak", ["list", "--app", "--columns=application", "--system"])  
+        process.waitForFinished()
+
+        output = process.readAllStandardOutput().data().decode().strip()
+        return package_name in output.splitlines()
+
+    def read_flatpakref(self):
+        package_info = {}
+        with open(self.flatpakref_file, 'r') as file:
+            for line in file:
+                if '=' in line:
+                    key, value = line.strip().split('=', 1)
+                    package_info[key] = value
+        return package_info
+
+    def show_gpg_key(self):
+        if "GPGKey" in self.package_info:
+            gpg_key = self.package_info["GPGKey"]
+            dialog = GPGKeyDialog(gpg_key, self)
+            dialog.exec_()
+        else:
+            QMessageBox.warning(self, self.tr("Clave GPG"), self.tr("No se encontró una clave GPG en el archivo."))
+
+    def start_installation(self):
+        self.scroll_area.setVisible(False)
+
+        self.install_button.setVisible(False)
+
+        self.install_output.setVisible(True)
+        self.progress_bar.setVisible(True)
+
+        self.process.start('flatpak', ['install', '-y', '--system', self.flatpakref_file])
+
+        self.process.readyReadStandardOutput.connect(self.update_output)
+        self.process.readyReadStandardError.connect(self.update_output)
+        self.process.finished.connect(self.installation_finished)
+
+    def start_uninstallation(self):
+        self.scroll_area.setVisible(False)
+
+        self.install_button.setVisible(False)
+
+        self.install_output.setVisible(True)
+        self.progress_bar.setVisible(True)
+
+        package_name = self.package_info.get("Name", "")
+        if package_name:
+            self.process.start('flatpak', ['remove', '-y', '--system', package_name])
+
+        self.process.readyReadStandardOutput.connect(self.update_output)
+        self.process.readyReadStandardError.connect(self.update_output)
+        self.process.finished.connect(self.uninstallation_finished)
+
+    def update_output(self):
+        output = self.process.readAllStandardOutput().data().decode()
+        error = self.process.readAllStandardError().data().decode()
+        if output:
+            self.install_output.append(output)
+        if error:
+            self.install_output.append(f"<span style='color:red;'>{error}</span>")
+
+        if "Installing" in output or "Removing" in output:
+            self.progress_bar.setValue(self.progress_bar.value() + 10)
+
+    def installation_finished(self):
+        self.progress_bar.setValue(100)
+        self.cancel_button.setText(self.tr('Finalizar'))
+        self.cancel_button.setStyleSheet("""
+            QPushButton {
+                background-color: #4CAF50;
+                border-radius: 8px;
+                color: white;
+                font-weight: bold;
+                padding: 5px 15px;
+            }
+            QPushButton:hover {
+                background-color: #45a049;
+            }
+        """)
+        self.cancel_button.clicked.disconnect()
+        self.cancel_button.clicked.connect(self.close)
+
+    def uninstallation_finished(self):
+        self.progress_bar.setValue(100)
+        self.cancel_button.setText(self.tr('Finalizar'))
+        self.cancel_button.setStyleSheet("""
+            QPushButton {
+                background-color: #4CAF50;
+                border-radius: 8px;
+                color: white;
+                font-weight: bold;
+                padding: 5px 15px;
+            }
+            QPushButton:hover {
+                background-color: #45a049;
+            }
+        """)
+        self.cancel_button.clicked.disconnect()
+        self.cancel_button.clicked.connect(self.close)
+
+    def cancel_installation(self):
+        if self.process.state() == QProcess.Running:
+            self.process.terminate() 
+
+        msg_box = QMessageBox(self)
+        msg_box.setWindowTitle(self.tr("Operación cancelada"))
+        msg_box.setText(self.tr("La operación ha sido cancelada."))
+        msg_box.setIcon(QMessageBox.Information)
+
+        close_button = QPushButton(self.tr("Cerrar"), self)
+        close_button.setFixedSize(100, 30)
+        close_button.setStyleSheet("""
+            QPushButton {
+                background-color: #4CAF50;
+                border-radius: 8px;
+                color: white;
+                font-weight: bold;
+                padding: 5px 15px;
+            }
+            QPushButton:hover {
+                background-color: #45a049;
+            }
+        """)
+        close_button.clicked.connect(self.close_program)
+
+        msg_box.addButton(close_button, QMessageBox.AcceptRole)
+        msg_box.exec_()
+
+    def close_program(self):
+        self.close()
+
+
+if __name__ == '__main__':
+    app = QApplication(sys.argv)
+
+    # Obtener el archivo .flatpakref como argumento
+    flatpakref_file = sys.argv[1] if len(sys.argv) > 1 else None
+
+    installer = FlatpakInstaller(flatpakref_file)
+    installer.show()
+    sys.exit(app.exec_())

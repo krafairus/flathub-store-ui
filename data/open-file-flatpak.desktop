@@ -1,0 +1,11 @@
+[Desktop Entry]
+Name=Instalar Paquete Flatpak
+Name[en]=Install Flatpak Package
+Comment=Instalador de archivos Flatpak (.flatpakref)
+Exec=/usr/bin/python3 /usr/share/flahub-store-ui/open-file-flatpak %f
+Icon=/usr/share/icons/hicolor/scalable/apps/flathub-store-ui.svg
+Type=Application
+MimeType=application/vnd.flatpak.ref;
+Terminal=false
+Categories=Utility;System;
+NoDisplay=true

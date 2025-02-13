@@ -29,12 +29,20 @@ install: build
 	# Add here commands to install the package into flathub-store-ui.
 	install -d $(DESTDIR)/usr/bin
 	install -m 755 flathub-store-ui $(DESTDIR)/usr/bin
-	install -d $(DESTDIR)/usr/bin/flathub-store-ui-files/icons
-	install -m 644 icons/*.png $(DESTDIR)/usr/bin/flathub-store-ui-files/icons
+	install -d $(DESTDIR)/usr/share/flathub-store-ui/icons
+	install -m 644 icons/*.png $(DESTDIR)/usr/share/flathub-store-ui/icons
+	install -d $(DESTDIR)/usr/share/flathub-store-ui/translations
+	install -m 644 translations/*.qm $(DESTDIR)/usr/share/flathub-store-ui/translations
 	install -d $(DESTDIR)/usr/share/applications
 	install -m 644 data/flathub-store-ui.desktop $(DESTDIR)/usr/share/applications/
+	install -d $(DESTDIR)/usr/share/applications
+	install -m 644 data/open-file-flatpak.desktop $(DESTDIR)/usr/share/applications/
 	install -d $(DESTDIR)/usr/share/icons/hicolor/scalable/apps
 	install -m 644 data/flathub-store-ui.svg $(DESTDIR)/usr/share/icons/hicolor/scalable/apps/
+	install -d $(DESTDIR)/usr/share/flathub-store-ui
+	install -m 755 data/flathub-store-ui $(DESTDIR)/usr/share/flathub-store-ui/
+	install -d $(DESTDIR)/usr/share/flathub-store-ui
+	install -m 755 data/open-file-flatpak $(DESTDIR)/usr/share/flathub-store-ui/
 
 # Build architecture-independent files here.
 binary-indep: build install
