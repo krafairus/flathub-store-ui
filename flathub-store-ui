@@ -4,34 +4,169 @@ import sys
 import os
 import json
 import subprocess
-from PyQt5.QtWidgets import QApplication, QDialog, QVBoxLayout, QPushButton, QLabel, QMessageBox
+from PyQt5.QtWidgets import (QApplication, QDialog, QVBoxLayout, QSizePolicy, QPushButton, 
+                            QLabel, QMessageBox, QWidget, QHBoxLayout)
 from PyQt5.QtGui import QIcon
+from PyQt5.QtCore import Qt
+
+class CustomTitleBar(QWidget):
+    def __init__(self, parent, title):
+        super().__init__(parent)
+        self.parent = parent
+        self.setFixedHeight(40)
+        self.setObjectName("title_bar")
+        self.setStyleSheet("""
+            QWidget#title_bar {
+                background-color: #262626;
+                border-bottom: 1px solid #333333;
+            }
+        """)
+        
+        layout = QHBoxLayout(self)
+        layout.setContentsMargins(10, 0, 10, 0)
+        layout.setSpacing(0)
+        
+        # Título
+        self.title_label = QLabel(title)
+        self.title_label.setStyleSheet("""
+            QLabel {
+                color: #BEBEBE;
+                font-size: 14px;
+                font-weight: bold;
+                padding-left: 5px;
+            }
+        """)
+        layout.addWidget(self.title_label)
+        
+        # Espaciador
+        spacer = QWidget()
+        spacer.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Preferred)
+        layout.addWidget(spacer)
+        
+        # Botón de cerrar
+        self.close_button = QPushButton("✕")
+        self.close_button.setFixedSize(40, 40)
+        self.close_button.setStyleSheet("""
+            QPushButton {
+                background-color: transparent;
+                color: #BEBEBE;
+                font-size: 16px;
+                border: none;
+                border-radius: 0px;
+            }
+            QPushButton:hover {
+                background-color: #4A4A4A;
+            }
+            QPushButton:pressed {
+                background-color: #323232;
+            }
+        """)
+        self.close_button.clicked.connect(parent.close)
+        layout.addWidget(self.close_button)
 
 class LanguageSelector(QDialog):
     def __init__(self):
         super().__init__()
-        self.setWindowTitle("Seleccionar Idioma")
-        self.setFixedSize(300, 200)
+        self.setWindowTitle("Flathub Store UI - Lenguages")
+        self.setFixedSize(400, 280)
         self.setWindowIcon(QIcon('/usr/share/icons/hicolor/scalable/apps/flathub-store-ui'))
+        self.setWindowFlags(Qt.FramelessWindowHint)
+        
+        # Estilo general de la ventana
+        self.setStyleSheet("""
+            QDialog {
+                background-color: #333333;
+                color: #ffffff;
+                border: 1px solid #444444;
+                border-radius: 5px;
+            }
+            QLabel {
+                color: #ffffff;
+                font-size: 14px;
+                padding: 10px;
+            }
+            QPushButton {
+                border-radius: 8px;
+                color: white;
+                font-weight: bold;
+                padding: 8px 15px;
+                min-width: 100px;
+                font-size: 14px;
+                border: none;
+            }
+            QPushButton:hover {
+                opacity: 0.9;
+            }
+            QPushButton:pressed {
+                opacity: 0.8;
+            }
+        """)
 
-        self.layout = QVBoxLayout()
+        # Crear barra de título personalizada
+        self.title_bar = CustomTitleBar(self, "Flathub Store UI - Lenguages")
+        
+        # Layout principal
+        main_layout = QVBoxLayout(self)
+        main_layout.setContentsMargins(0, 0, 0, 0)
+        main_layout.setSpacing(0)
+        main_layout.addWidget(self.title_bar)
+        
+        # Contenido
+        content_widget = QWidget()
+        content_layout = QVBoxLayout(content_widget)
+        content_layout.setContentsMargins(20, 20, 20, 20)
+        content_layout.setSpacing(15)
+        
+        self.label = QLabel("Por favor, seleccione un idioma:")
+        content_layout.addWidget(self.label)
 
-        self.label = QLabel("Por favor, seleccione un idioma: ")
-        self.layout.addWidget(self.label)
-
+        # Botón inglés (azul claro)
         self.button_english = QPushButton("English")
         self.button_english.clicked.connect(lambda: self.select_language("en"))
-        self.layout.addWidget(self.button_english)
+        self.button_english.setStyleSheet("""
+            QPushButton {
+                background-color: #66b3ff;
+            }
+        """)
+        content_layout.addWidget(self.button_english)
 
+        # Botón español (verde claro)
         self.button_spanish = QPushButton("Español")
         self.button_spanish.clicked.connect(lambda: self.select_language("es"))
-        self.layout.addWidget(self.button_spanish)
+        self.button_spanish.setStyleSheet("""
+            QPushButton {
+                background-color: #77dd77;
+            }
+        """)
+        content_layout.addWidget(self.button_spanish)
 
+        # Botón portugués (naranja claro)
         self.button_portuguese = QPushButton("Português")
         self.button_portuguese.clicked.connect(lambda: self.select_language("pt"))
-        self.layout.addWidget(self.button_portuguese)
+        self.button_portuguese.setStyleSheet("""
+            QPushButton {
+                background-color: #ffb347;
+            }
+        """)
+        content_layout.addWidget(self.button_portuguese)
 
-        self.setLayout(self.layout)
+        main_layout.addWidget(content_widget)
+
+    def mousePressEvent(self, event):
+        if event.button() == Qt.LeftButton and self.title_bar.underMouse():
+            self.drag_pos = event.globalPos()
+            event.accept()
+
+    def mouseMoveEvent(self, event):
+        if event.buttons() == Qt.LeftButton and hasattr(self, 'drag_pos'):
+            self.move(self.pos() + event.globalPos() - self.drag_pos)
+            self.drag_pos = event.globalPos()
+            event.accept()
+
+    def mouseReleaseEvent(self, event):
+        if event.button() == Qt.LeftButton and hasattr(self, 'drag_pos'):
+            delattr(self, 'drag_pos')
+            event.accept()
 
     def select_language(self, language_code):
         config_path = os.path.expanduser("~/.flathubui-config/config.json")
@@ -44,7 +179,8 @@ class LanguageSelector(QDialog):
         with open(config_path, "w") as config_file:
             json.dump(config, config_file)
 
-        QMessageBox.information(self, "Idioma seleccionado", f"Idioma seleccionado: {language_code}")
+        QMessageBox.information(self, "Idioma seleccionado", 
+                              f"Idioma seleccionado: {language_code}")
         self.close()
 
         try:
