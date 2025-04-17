@@ -26,7 +26,6 @@ class CustomTitleBar(QWidget):
         layout.setContentsMargins(10, 0, 10, 0)
         layout.setSpacing(0)
         
-        # Título
         self.title_label = QLabel(title)
         self.title_label.setStyleSheet("""
             QLabel {
@@ -38,12 +37,10 @@ class CustomTitleBar(QWidget):
         """)
         layout.addWidget(self.title_label)
         
-        # Espaciador
         spacer = QWidget()
         spacer.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Preferred)
         layout.addWidget(spacer)
         
-        # Botón de cerrar
         self.close_button = QPushButton("✕")
         self.close_button.setFixedSize(40, 40)
         self.close_button.setStyleSheet("""
@@ -72,7 +69,6 @@ class LanguageSelector(QDialog):
         self.setWindowIcon(QIcon('/usr/share/icons/hicolor/scalable/apps/flathub-store-ui'))
         self.setWindowFlags(Qt.FramelessWindowHint)
         
-        # Estilo general de la ventana
         self.setStyleSheet("""
             QDialog {
                 background-color: #333333;
@@ -102,16 +98,13 @@ class LanguageSelector(QDialog):
             }
         """)
 
-        # Crear barra de título personalizada
         self.title_bar = CustomTitleBar(self, "Flathub Store UI - Lenguages")
         
-        # Layout principal
         main_layout = QVBoxLayout(self)
         main_layout.setContentsMargins(0, 0, 0, 0)
         main_layout.setSpacing(0)
         main_layout.addWidget(self.title_bar)
         
-        # Contenido
         content_widget = QWidget()
         content_layout = QVBoxLayout(content_widget)
         content_layout.setContentsMargins(20, 20, 20, 20)
@@ -120,7 +113,6 @@ class LanguageSelector(QDialog):
         self.label = QLabel("Por favor, seleccione un idioma:")
         content_layout.addWidget(self.label)
 
-        # Botón inglés (azul claro)
         self.button_english = QPushButton("English")
         self.button_english.clicked.connect(lambda: self.select_language("en"))
         self.button_english.setStyleSheet("""
@@ -130,7 +122,6 @@ class LanguageSelector(QDialog):
         """)
         content_layout.addWidget(self.button_english)
 
-        # Botón español (verde claro)
         self.button_spanish = QPushButton("Español")
         self.button_spanish.clicked.connect(lambda: self.select_language("es"))
         self.button_spanish.setStyleSheet("""
@@ -140,7 +131,6 @@ class LanguageSelector(QDialog):
         """)
         content_layout.addWidget(self.button_spanish)
 
-        # Botón portugués (naranja claro)
         self.button_portuguese = QPushButton("Português")
         self.button_portuguese.clicked.connect(lambda: self.select_language("pt"))
         self.button_portuguese.setStyleSheet("""
