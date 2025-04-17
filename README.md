@@ -6,5 +6,9 @@ Version Web de Flathub instalable que te permite instalar paquetes desde flathub
 
 Ahora disponible un paquete especifico para deepin 23 - amd64 que soluciona un problema de qt6 faltante.
 
+## Futuras opciones: 
+(en proceso) Muy pronto terminare la implementacion de las traducciones, Aunque ya esta implementado la carga de las tradicciones y demas tengo pensado en mejorar el proceso para no tener que traducir todo el programa poco a poco, y que sea de forma automatica.
+(caracteristicas) Añadire nuevas caracteristicas para integrar mas las opciones de flatpak de forma grafica.
+
 Bajo la licencia MIT.
 Gracias al apoyo de la comunidad de deepin en español y el equipo deepines: https://github.com/deepin-espanol
