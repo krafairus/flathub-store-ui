@@ -7,7 +7,7 @@ from PyQt6.QtWidgets import (
     QToolBar, QFileDialog, QHBoxLayout, QLabel, QScrollArea, QFrame, QProgressBar
 )
 from PyQt6.QtWebEngineWidgets import QWebEngineView
-from PyQt6.QtWebEngineCore import QWebEngineProfile, QWebEngineSettings
+from PyQt6.QtWebEngineCore import QWebEngineProfile, QWebEngineSettings, QWebEngineDownloadRequest
 
 import shutil
 import sys
@@ -214,7 +214,7 @@ class CommandOutput(CustomTitleBarDialog):
         self.button_layout = QHBoxLayout(self.button_container)
         self.button_layout.setContentsMargins(0, 10, 0, 0)
         
-        self.action_button = QPushButton(self.tr("Cancelar"), self)
+        self.action_button = QPushButton(self.tr("Cancel"), self)
         self.action_button.setStyleSheet("""
             QPushButton {
                 background-color: #FF5C5C;
@@ -233,7 +233,7 @@ class CommandOutput(CustomTitleBarDialog):
             }
         """)
         
-        self.close_button = QPushButton(self.tr("Finalizar"), self)
+        self.close_button = QPushButton(self.tr("Finish"), self)
         self.close_button.setStyleSheet("""
             QPushButton {
                 background-color: #4CAF50;
@@ -268,14 +268,14 @@ class CommandOutput(CustomTitleBarDialog):
             self.action_button.clicked.connect(self.cancel_process)
             self.process.finished.connect(self.on_process_finished)
         else:
-            self.action_button.setText(self.tr("Cerrar"))
+            self.action_button.setText(self.tr("Close"))
             self.action_button.clicked.connect(self.close)
 
     def cancel_process(self):
         if self.process:
             self.process.terminate()
             self.process.waitForFinished()
-            self.text_edit.append(self.tr("\nProceso cancelado por el usuario."))
+            self.text_edit.append(self.tr("\nProcess canceled by user."))
             self.switch_to_finalize_button()
 
     def on_process_finished(self):
@@ -290,7 +290,7 @@ class CommandOutput(CustomTitleBarDialog):
 
 class InstalledAppsDialog(CustomTitleBarDialog):
     def __init__(self, parent=None):
-        super().__init__(parent.tr('Aplicaciones Flatpak Instaladas'), parent)
+        super().__init__(parent.tr('Installed Flatpak Applications'), parent)
         self.resize(650, 450)
 
         self.content_widget.setStyleSheet("""
@@ -318,11 +318,11 @@ class InstalledAppsDialog(CustomTitleBarDialog):
 
         self.nav_bar = QHBoxLayout()
 
-        self.label_category = QLabel(self.tr("Filtrar lista por:"), self)
+        self.label_category = QLabel(self.tr("Filter list by:"), self)
         self.label_category.setStyleSheet("QLabel { font-size: 12px; color: #48c0d5; margin-left: 10px; }")
         self.nav_bar.addWidget(self.label_category)
 
-        self.button_system = QPushButton(self.tr("Sistema"), self)
+        self.button_system = QPushButton(self.tr("System"), self)
         self.button_system.setFixedSize(100, 30)
         self.button_system.setStyleSheet("""
             QPushButton {
@@ -340,7 +340,7 @@ class InstalledAppsDialog(CustomTitleBarDialog):
         self.button_system.clicked.connect(lambda: self.filter_apps("system"))
         self.nav_bar.addWidget(self.button_system)
 
-        self.button_user = QPushButton(self.tr("Usuario"), self)
+        self.button_user = QPushButton(self.tr("User"), self)
         self.button_user.setFixedSize(100, 30)
         self.button_user.setStyleSheet("""
             QPushButton {
@@ -379,7 +379,7 @@ class InstalledAppsDialog(CustomTitleBarDialog):
         self.scroll_area.setWidget(self.scroll_content)
         self.content_layout.addWidget(self.scroll_area)
 
-        self.button_close = QPushButton(self.tr("Cerrar"), self)
+        self.button_close = QPushButton(self.tr("Close"), self)
         self.button_close.setStyleSheet("""
             QPushButton {
                 background-color: #4CAF50;
@@ -454,7 +454,7 @@ class InstalledAppsDialog(CustomTitleBarDialog):
                 app_layout = QHBoxLayout(frame)
                 app_layout.setContentsMargins(12, 8, 12, 8)
 
-                app_label = QLabel(f"{app_name}\n<small>({'Usuario' if installation_type == 'user' else 'Sistema'})</small>")
+                app_label = QLabel(f"{app_name}\n<small>({'User' if installation_type == 'user' else 'System'})</small>")
                 app_label.setStyleSheet("""
                     QLabel {
                         color: #ffffff;
@@ -467,7 +467,7 @@ class InstalledAppsDialog(CustomTitleBarDialog):
                 app_label.setWordWrap(True)
                 app_layout.addWidget(app_label, stretch=1)
 
-                info_button = QPushButton(self.tr("Información"))
+                info_button = QPushButton(self.tr("Info"))
                 info_button.setFixedSize(100, 30)
                 info_button.setStyleSheet("""
                     QPushButton {
@@ -483,7 +483,7 @@ class InstalledAppsDialog(CustomTitleBarDialog):
                 info_button.clicked.connect(lambda _, name=app_name: self.show_app_info(name))
                 app_layout.addWidget(info_button)
 
-                uninstall_button = QPushButton(self.tr("Desinstalar"))
+                uninstall_button = QPushButton(self.tr("Uninstall"))
                 uninstall_button.setFixedSize(100, 30)
                 uninstall_button.setStyleSheet("""
                     QPushButton {
@@ -506,8 +506,8 @@ class InstalledAppsDialog(CustomTitleBarDialog):
     def uninstall_app(self, app_name, installation_type):
         self.uninstall_process = QProcess()
         self.output_window = CommandOutput(
-            self.tr("Desinstalando..."), 
-            self.tr(f"Iniciando desinstalación de {app_name}...\n"), 
+            self.tr("Uninstalling..."), 
+            self.tr(f"Starting uninstallation of {app_name}...\n"), 
             process=self.uninstall_process, 
             is_process=True, 
             parent=self
@@ -533,7 +533,7 @@ class InstalledAppsDialog(CustomTitleBarDialog):
         self.all_apps = self.load_all_apps()
         self.filter_apps("all")
         
-        self.output_window.text_edit.append("\nDesinstalación completada.")
+        self.output_window.text_edit.append("\nUninstallation completed.")
         self.output_window.switch_to_finalize_button()
 
     def show_app_info(self, app_name):
@@ -547,7 +547,7 @@ class InstalledAppsDialog(CustomTitleBarDialog):
             info_window.setWindowModality(Qt.WindowModality.ApplicationModal)
             info_window.show()
         else:
-            library_window = CustomTitleBarDialog(self.tr(f'Información: {app_name}'), self)
+            library_window = CustomTitleBarDialog(self.tr(f'Info: {app_name}'), self)
             library_window.resize(500, 200)  
             
             container = QWidget()
@@ -557,11 +557,11 @@ class InstalledAppsDialog(CustomTitleBarDialog):
             layout.setSpacing(15)
             
             message = QLabel(self.tr("""
-                <p style='font-size: 14px;'>Esto paquete flatpak no es una app, es una librería o </p>
-                <p style='font-size: 14px;'>biblioteca requerida por otra app o perteneciente</p>
-                <p style='font-size: 14px;'> a un conjunto de librerias instaladas automáticamente</p>
-                <p style='font-size: 14px;'> o manualmente.</p>
-                <p style='font-size: 14px; margin-top: 10px;'>Si ya no requiere de su uso puede eliminarla.</p>
+                <p style='font-size: 14px;'>This flatpak package is not an app, it's a library or </p>
+                <p style='font-size: 14px;'>dependency required by another app or belonging</p>
+                <p style='font-size: 14px;'> to a set of automatically installed libraries</p>
+                <p style='font-size: 14px;'> or manually installed.</p>
+                <p style='font-size: 14px; margin-top: 10px;'>If you no longer need it, you can uninstall it.</p>
             """))
             message.setAlignment(Qt.AlignmentFlag.AlignCenter)
             message.setStyleSheet("""
@@ -571,7 +571,7 @@ class InstalledAppsDialog(CustomTitleBarDialog):
             """)
             message.setTextFormat(Qt.TextFormat.RichText)
             
-            close_button = QPushButton(self.tr("Cerrar"))
+            close_button = QPushButton(self.tr("Close"))
             close_button.setFixedSize(100, 30)
             close_button.setStyleSheet("""
                 QPushButton {
@@ -602,7 +602,7 @@ class InstalledAppsDialog(CustomTitleBarDialog):
 
 class RepairProgressDialog(CustomTitleBarDialog):
     def __init__(self, parent=None):
-        super().__init__(parent.tr('Reparación de Flatpak'), parent)
+        super().__init__(parent.tr('Flatpak Repair'), parent)
         self.resize(600, 450)
 
         self.progress_bar = QProgressBar(self)
@@ -611,7 +611,7 @@ class RepairProgressDialog(CustomTitleBarDialog):
         self.text_edit.setReadOnly(True)
         self.content_layout.addWidget(self.text_edit)
 
-        self.button_cancel = QPushButton(self.tr("Cancelar"), self)
+        self.button_cancel = QPushButton(self.tr("Cancel"), self)
         self.button_cancel.setStyleSheet("""
             QPushButton {
                 background-color: #FF5C5C;
@@ -627,7 +627,7 @@ class RepairProgressDialog(CustomTitleBarDialog):
         self.button_cancel.clicked.connect(self.cancel_repair_process)
         self.content_layout.addWidget(self.button_cancel)
 
-        self.button_finalize = QPushButton(self.tr("Finalizar"), self)
+        self.button_finalize = QPushButton(self.tr("Finish"), self)
         self.button_finalize.setStyleSheet("""
             QPushButton {
                 background-color: #4CAF50;
@@ -652,7 +652,7 @@ class RepairProgressDialog(CustomTitleBarDialog):
         if self.repair_process:
             self.repair_process.terminate()
             self.repair_process.waitForFinished()
-            self.text_edit.append(self.tr("Reparación cancelada."))
+            self.text_edit.append(self.tr("Repair canceled."))
         self.switch_to_finalize_button()
 
     def switch_to_finalize_button(self):
@@ -661,7 +661,7 @@ class RepairProgressDialog(CustomTitleBarDialog):
 
 class AboutDialog(CustomTitleBarDialog):
     def __init__(self, parent=None):
-        super().__init__(parent.tr('Acerca de Flatpak Store Ui'), parent)
+        super().__init__(parent.tr('About Flatpak Store Ui'), parent)
         self.resize(410, 450)  
         
         self.content_widget.setStyleSheet("""
@@ -715,10 +715,10 @@ class AboutDialog(CustomTitleBarDialog):
         version_info.setSpacing(5)
         
         flatpak_version = self.get_flatpak_version()
-        flatpak_label = QLabel(f"<b>Flatpak Versión:</b> {flatpak_version}")
+        flatpak_label = QLabel(f"<b>Flatpak Version:</b> {flatpak_version}")
         app_count = self.get_installed_app_count()
-        app_count_label = QLabel(f"<b>Aplicaciones instaladas (sistema):</b> {app_count}")
-        version_label = QLabel("<b>Versión de la app:</b> 1.6.0")
+        app_count_label = QLabel(f"<b>Installed apps (system):</b> {app_count}")
+        version_label = QLabel("<b>App version:</b> 1.6.1")
         
         for label in [flatpak_label, app_count_label, version_label]:
             label.setTextFormat(Qt.TextFormat.RichText)
@@ -729,8 +729,8 @@ class AboutDialog(CustomTitleBarDialog):
         dev_info = QVBoxLayout()
         dev_info.setSpacing(5)
         
-        creator_label = QLabel("<b>Desarrollado por:</b> krafairus")
-        licence_label = QLabel("<b>Licencia:</b> MIT")
+        creator_label = QLabel("<b>Developed by:</b> krafairus")
+        licence_label = QLabel("<b>License:</b> MIT")
         url_label = QLabel('<b>GitHub:</b> <a href="https://github.com/krafairus/flatpak-store-ui" style="color: #4CAF50;">github.com/krafairus/flatpak-store-ui</a>')
         url_label.setOpenExternalLinks(True)
         
@@ -743,10 +743,12 @@ class AboutDialog(CustomTitleBarDialog):
         notes = QVBoxLayout()
         notes.setSpacing(5)
         
-        note1_label = QLabel("• Este software no está afiliado a Flathub ni a flatseal.")
-        note2_label = QLabel("• No proporcionamos ningún programa alojado en Flathub.")
+        note1_label = QLabel("• This application is not affiliated with Flathub or flatseal.")
+        note2_label = QLabel("• We are not responsible for damages caused \n by the use of this application.")
+        note3_label = QLabel("• We are not affiliated with the flatseal project, \n we just provide direct access to it.")
+        note4_label = QLabel("• We don't provide any programs hosted on Flathub.")
         
-        for label in [note1_label, note2_label]:
+        for label in [note1_label, note2_label, note3_label, note4_label]:
             notes.addWidget(label)
         
         main_layout.addLayout(notes)
@@ -754,8 +756,8 @@ class AboutDialog(CustomTitleBarDialog):
         thanks = QVBoxLayout()
         thanks.setSpacing(5)
         
-        thanks_label = QLabel("<b>Agradecimientos a:</b>")
-        team_url = QLabel('<b>Equipo de Deepin en Español:</b> <a href="https://deepinenespañol.org" style="color: #4CAF50;">deepinenespañol.org</a>')
+        thanks_label = QLabel("<b>Special thanks to:</b>")
+        team_url = QLabel('<b>Deepin in Spanish Team:</b> <a href="https://deepinenespañol.org" style="color: #4CAF50;">deepinenespañol.org</a>')
         team_url.setOpenExternalLinks(True)
         
         thanks_label.setTextFormat(Qt.TextFormat.RichText)
@@ -770,7 +772,7 @@ class AboutDialog(CustomTitleBarDialog):
         button_layout = QHBoxLayout(button_container)
         button_layout.setContentsMargins(0, 0, 0, 0)
         
-        close_button = QPushButton(self.tr("Cerrar"))
+        close_button = QPushButton(self.tr("Close"))
         close_button.clicked.connect(self.close)
         button_layout.addStretch()
         button_layout.addWidget(close_button)
@@ -845,7 +847,7 @@ class PythonWebView(QMainWindow):
         profile.setHttpAcceptLanguage("es-ES,es;q=0.9")
 
         self.wview.load(QUrl('https://flathub.org/es'))
-        self.wview.page().profile().downloadRequested.connect(self.download_requested)
+        profile.downloadRequested.connect(self.download_requested)
         self.layout.addWidget(self.wview)
         
         self.wview.urlChanged.connect(self.update_back_button)
@@ -926,16 +928,16 @@ class PythonWebView(QMainWindow):
             self.show_flatseal_install_dialog()
 
     def show_flatseal_install_dialog(self):
-        self.install_dialog = CustomTitleBarDialog(self.tr("Flatseal no instalado"), self)
+        self.install_dialog = CustomTitleBarDialog(self.tr("Flatseal not installed"), self)
         self.install_dialog.resize(500, 240)
         
         content = QWidget()
         layout = QVBoxLayout(content)
         
         message = QLabel(self.tr("""
-            <p style='font-size: 14px;'>Flatseal no está instalado en su sistema.</p>
-            <p style='font-size: 14px;'>Flatseal es una herramienta gráfica para gestionar permisos de aplicaciones Flatpak.</p>
-            <p style='font-size: 14px; margin-top: 15px;'>¿Desea instalarlo ahora?</p>
+            <p style='font-size: 14px;'>Flatseal is not installed on your system.</p>
+            <p style='font-size: 14px;'>Flatseal is a graphical tool to manage Flatpak application permissions.</p>
+            <p style='font-size: 14px; margin-top: 15px;'>Do you want to install it now?</p>
         """))
         message.setAlignment(Qt.AlignmentFlag.AlignCenter)
         message.setWordWrap(True)
@@ -945,7 +947,7 @@ class PythonWebView(QMainWindow):
         button_container = QWidget()
         button_layout = QHBoxLayout(button_container)
         
-        cancel_button = QPushButton(self.tr("Cancelar"))
+        cancel_button = QPushButton(self.tr("Cancel"))
         cancel_button.setStyleSheet("""
             QPushButton {
                 background-color: #FF5C5C;
@@ -965,7 +967,7 @@ class PythonWebView(QMainWindow):
         """)
         cancel_button.clicked.connect(self.install_dialog.close)
         
-        install_button = QPushButton(self.tr("Instalar"))
+        install_button = QPushButton(self.tr("Install"))
         install_button.setStyleSheet("""
             QPushButton {
                 background-color: #4CAF50;
@@ -1026,7 +1028,7 @@ class PythonWebView(QMainWindow):
         """)
         layout.addWidget(self.flatseal_output)
         
-        self.cancel_button = QPushButton(self.tr("Cancelar"))
+        self.cancel_button = QPushButton(self.tr("Cancel"))
         self.cancel_button.setStyleSheet("""
             QPushButton {
                 background-color: #FF5C5C;
@@ -1046,7 +1048,7 @@ class PythonWebView(QMainWindow):
         """)
         layout.addWidget(self.cancel_button, 0, Qt.AlignmentFlag.AlignCenter)
         
-        self.accept_button = QPushButton(self.tr("Aceptar"))
+        self.accept_button = QPushButton(self.tr("Accept"))
         self.accept_button.setStyleSheet("""
             QPushButton {
                 background-color: #4CAF50;
@@ -1071,7 +1073,7 @@ class PythonWebView(QMainWindow):
         self.install_window.resize(600, 400)
         self.install_window.show()
         
-        self.flatseal_output.append(self.tr("Iniciando instalación de Flatseal..."))
+        self.flatseal_output.append(self.tr("Starting Flatseal installation..."))
         
         self.flatseal_process = QProcess()
         self.flatseal_process.setProcessChannelMode(QProcess.ProcessChannelMode.MergedChannels)
@@ -1092,16 +1094,16 @@ class PythonWebView(QMainWindow):
         if self.flatseal_process and self.flatseal_process.state() == QProcess.ProcessState.Running:
             self.flatseal_process.terminate()
             self.flatseal_process.waitForFinished()
-            self.flatseal_output.append(self.tr("\nInstalación cancelada por el usuario."))
+            self.flatseal_output.append(self.tr("\nInstallation canceled by user."))
             self.cancel_button.hide()
             self.accept_button.show()
 
     def on_flatseal_installation_finished(self, exit_code, exit_status):
         if exit_code == 0 and exit_status == QProcess.ExitStatus.NormalExit:
-            self.flatseal_output.append(self.tr("\nInstalación completada correctamente."))
+            self.flatseal_output.append(self.tr("\nInstallation completed successfully."))
         else:
             error = self.flatseal_process.readAllStandardError().data().decode()
-            self.flatseal_output.append(self.tr("\nError durante la instalación:"))
+            self.flatseal_output.append(self.tr("\nError during installation:"))
             self.flatseal_output.append(error)
         
         self.cancel_button.hide()
@@ -1124,40 +1126,40 @@ class PythonWebView(QMainWindow):
         title_layout.setSpacing(0)
 
         self.create_icon_button(
-            self.tr("Inicio flatpak"), 
+            self.tr("Flatpak home"), 
             "/usr/share/flatpak-store-ui/icons/home.png", 
             self.go_home, title_layout)
         self.button_back = self.create_icon_button(
-            self.tr("Volver"), 
+            self.tr("Back"), 
             "/usr/share/flatpak-store-ui/icons/back.png", 
             self.go_back, title_layout, enable=False)
         self.create_icon_button(
-            self.tr("Gestionar apps"), 
+            self.tr("Manage apps"), 
             "/usr/share/flatpak-store-ui/icons/applications.png", 
             self.show_installed_apps, title_layout)
         self.create_icon_button(
-            self.tr("Actualizar Apps"), 
+            self.tr("Update Apps"), 
             "/usr/share/flatpak-store-ui/icons/update.png", 
             self.update_flatpaks, title_layout)
         self.create_icon_button(
-            self.tr("Historial de operaciones recientes"), 
+            self.tr("Recent operations history"), 
             "/usr/share/flatpak-store-ui/icons/history.png", 
             self.show_history, title_layout)
         self.create_icon_button(
-            self.tr("Reparar Paquetes"), 
+            self.tr("Repair Packages"), 
             "/usr/share/flatpak-store-ui/icons/repair.png", 
             self.repair_flatpak, title_layout)
         self.create_icon_button(
-            self.tr("Configurar permisos (Flatseal)"), 
+            self.tr("Configure permissions (Flatseal)"), 
             "/usr/share/flatpak-store-ui/icons/com.github.tchx84.Flatseal.svg",
             self.open_flatseal, 
             title_layout)
         self.create_icon_button(
-            self.tr("Instalar .flatpak"), 
+            self.tr("Install .flatpak"), 
             "/usr/share/flatpak-store-ui/icons/local.png", 
             self.install_local_flatpak, title_layout)
         self.create_icon_button(
-            self.tr("Acerca de"), 
+            self.tr("About"), 
             "/usr/share/flatpak-store-ui/icons/about.png", 
             self.show_about, title_layout)
 
@@ -1348,7 +1350,7 @@ class PythonWebView(QMainWindow):
 
     def update_flatpaks(self):
         self.update_process = QProcess()
-        self.output_window = CommandOutput(self.tr("Actualización en progreso..."), "", process=self.update_process, is_process=True, parent=self)
+        self.output_window = CommandOutput(self.tr("Update in progress..."), "", process=self.update_process, is_process=True, parent=self)
         self.output_window.show()
 
         self.update_process.setProcessChannelMode(QProcess.ProcessChannelMode.MergedChannels)
@@ -1362,12 +1364,12 @@ class PythonWebView(QMainWindow):
         process.waitForFinished()
         history_output = process.readAllStandardOutput().data().decode()
 
-        self.history_window = CommandOutput(self.tr("Historial de operaciones recientes"), history_output, parent=self)
+        self.history_window = CommandOutput(self.tr("Recent operations history"), history_output, parent=self)
         self.history_window.show()
 
     def repair_flatpak(self):
         self.repair_process = QProcess()
-        self.output_window = CommandOutput(self.tr("Reparación en progreso..."), "", process=self.repair_process, is_process=True, parent=self)
+        self.output_window = CommandOutput(self.tr("Repair in progress..."), "", process=self.repair_process, is_process=True, parent=self)
         self.output_window.show()
 
         self.repair_process.setProcessChannelMode(QProcess.ProcessChannelMode.MergedChannels)
@@ -1384,7 +1386,7 @@ class PythonWebView(QMainWindow):
             flatpakref_path = file_dialog.selectedFiles()[0]
 
             self.local_install_process = QProcess()
-            self.output_window = CommandOutput(self.tr("Instalación de paquete Flatpak en progreso..."), "", process=self.local_install_process, is_process=True, parent=self)
+            self.output_window = CommandOutput(self.tr("Flatpak package installation in progress..."), "", process=self.local_install_process, is_process=True, parent=self)
             self.output_window.show()
 
             self.local_install_process.setProcessChannelMode(QProcess.ProcessChannelMode.MergedChannels)  
@@ -1394,7 +1396,7 @@ class PythonWebView(QMainWindow):
             self.local_install_process.start('flatpak', ['install', '--system', '-y', flatpakref_path])
 
             if not self.local_install_process.waitForStarted():
-                self.output_window.text_edit.append(self.tr("Error: No se pudo iniciar el proceso de instalación."))
+                self.output_window.text_edit.append(self.tr("Error: Could not start installation process."))
                 return
 
     def read_process_output(self):
@@ -1405,11 +1407,11 @@ class PythonWebView(QMainWindow):
 
     def on_install_finished(self, exit_code, exit_status):
         if self.local_install_process:
-            print(f"Proceso finalizado con código {exit_code} y estado {exit_status}")
+            print(f"Process finished with code {exit_code} and status {exit_status}")
             if exit_status == QProcess.ExitStatus.NormalExit and exit_code == 0:
-                self.output_window.text_edit.append(self.tr("Instalación completada correctamente."))
+                self.output_window.text_edit.append(self.tr("Installation completed successfully."))
             else:
-                self.output_window.text_edit.append(self.tr("Proceso finalizado."))
+                self.output_window.text_edit.append(self.tr("Process finished."))
             self.output_window.switch_to_finalize_button()
 
     def download_requested(self, download):
@@ -1420,7 +1422,7 @@ class PythonWebView(QMainWindow):
                 fp.close()
 
                 self.process = QProcess()
-                self.output_window = CommandOutput(self.tr("Instalación de paquete Flatpak en progreso..."), "", process=self.process, is_process=True, parent=self)
+                self.output_window = CommandOutput(self.tr("Flatpak package installation in progress..."), "", process=self.process, is_process=True, parent=self)
                 self.output_window.show()
 
                 self.process.setProcessChannelMode(QProcess.ProcessChannelMode.MergedChannels)
@@ -1450,7 +1452,7 @@ def load_language_config():
                 return language
             return default_language
     except (FileNotFoundError, json.JSONDecodeError, KeyError):
-        print("No se pudo cargar el archivo de configuración. Usando idioma predeterminado.")
+        print("Could not load configuration file. Using default language.")
         return default_language
 
 def load_translation(app, language_code):
@@ -1464,10 +1466,10 @@ def load_translation(app, language_code):
     for path in possible_paths:
         if translator.load(path):
             app.installTranslator(translator)
-            print(f"Traducción cargada desde: {path}")
+            print(f"Translation loaded from: {path}")
             return True
     
-    print(f"Advertencia: No se encontró el archivo de traducción para '{language_code}'")
+    print(f"Warning: Translation file not found for '{language_code}'")
     return False
 
 if __name__ == "__main__":

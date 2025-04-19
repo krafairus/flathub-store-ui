@@ -1,10 +1,11 @@
 [Desktop Entry]
 Encoding=UTF-8
 Keywords=package;installer;flatpak;
-Name=Instalar Paquete Flatpak
-GenericName=Instalar Paquete Flatpak
-Name[en]=Install Flatpak Package
-Comment=Remover o instalar paquetes flatpak.
+Name=Install Flatpak Package
+GenericName=Install Flatpak Package
+Name[es]=Instalar paquete flatpak.
+Name[pt]=Instalar pacote flatpak
+Comment=Remove or install flatpak packages.
 Exec=/usr/bin/python3 /usr/share/flatpak-store-ui/open-file-flatpak %F
 Icon=/usr/share/icons/hicolor/scalable/apps/flatpak-store-ui.svg
 Type=Application

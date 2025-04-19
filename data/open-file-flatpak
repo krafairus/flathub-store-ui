@@ -13,7 +13,7 @@ translation_path = "/usr/share/flatpak-store-ui/translations"
 class GPGKeyDialog(QDialog):
     def __init__(self, gpg_key, parent=None):
         super().__init__(parent)
-        self.setWindowTitle(self.tr("Clave GPG"))
+        self.setWindowTitle(self.tr("GPG Key"))
         self.setFixedSize(400, 300)
         self.setWindowIcon(QIcon('/usr/share/icons/hicolor/scalable/apps/flatpak-store-ui.svg'))
 
@@ -29,7 +29,7 @@ class GPGKeyDialog(QDialog):
 
         button_layout.addStretch()
 
-        close_button = QPushButton(self.tr("Cerrar"), self)
+        close_button = QPushButton(self.tr("Close"), self)
         close_button.setFixedSize(100, 30)
         close_button.setStyleSheet("""
             QPushButton {
@@ -141,10 +141,10 @@ class FlatpakInstaller(QWidget):
 
     def stop_process(self):
         if self.process.state() == QProcess.Running:
-            print("Deteniendo el proceso en segundo plano...")
+            print("Stopping background process...")
             self.process.terminate() 
             if not self.process.waitForFinished(2000): 
-                print("Forzando la terminación del proceso...")
+                print("Forcing process termination...")
                 self.process.kill() 
                 self.process.waitForFinished() 
 
@@ -160,15 +160,15 @@ class FlatpakInstaller(QWidget):
                                 status = status_file.read()
 
                             if f"PPid:\t{parent_pid}" in status:
-                                print(f"Matando subproceso: PID {proc}")
+                                print(f"Killing child process: PID {proc}")
                                 os.kill(int(proc), signal.SIGKILL)
                         except (FileNotFoundError, PermissionError, ValueError):
                             continue
             except Exception as e:
-                print(f"Error al matar subprocesos: {e}")
+                print(f"Error killing child processes: {e}")
 
     def terminate_python_process(self):
-        print("Forzando la terminación del proceso de Python...")
+        print("Forcing Python process termination...")
         os.kill(os.getpid(), signal.SIGTERM) 
 
     def cancel_installation(self):
@@ -178,7 +178,7 @@ class FlatpakInstaller(QWidget):
         self.close()
 
     def initUI(self):
-        self.setWindowTitle(self.tr('Instalador de Flatpak')) 
+        self.setWindowTitle(self.tr('Flatpak Installer')) 
         self.setMinimumSize(400, 400)
         self.setWindowIcon(QIcon('/usr/share/icons/hicolor/scalable/apps/flatpak-store-ui.svg'))
 
@@ -196,7 +196,7 @@ class FlatpakInstaller(QWidget):
             self.flatpakref_file = self.open_file_dialog()
 
         if not self.flatpakref_file:
-            QMessageBox.warning(self, self.tr("Error"), self.tr("No se seleccionó ningún archivo."))
+            QMessageBox.warning(self, self.tr("Error"), self.tr("No file was selected."))
             sys.exit(1)
 
         self.package_info = self.read_flatpakref()
@@ -215,19 +215,19 @@ class FlatpakInstaller(QWidget):
             warning_container.setStyleSheet("background-color: #FF2D2D; color: #CADFE5; border-radius: 5px; padding: 10px;")
 
             warning_layout = QVBoxLayout(warning_container)
-            warning_label = QLabel(self.tr("¡Advertencia! Este paquete ya está instalado."))
+            warning_label = QLabel(self.tr("Warning! This package is already installed."))
             warning_label.setWordWrap(True)
             warning_layout.addWidget(warning_label)
             self.info_layout.addWidget(warning_container)
 
         translations = {
-            "Name": self.tr("Nombre"),
-            "Title": self.tr("Titulo del paquete"),
-            "Branch": self.tr("Rama"),
-            "Url": self.tr("URL del repositorio"),
-            "SuggestRemoteName": self.tr("Nombre del repositorio"),
-            "IsRuntime": self.tr("Es un runtime"),
-            "RuntimeRepo": self.tr("Obtenido desde")
+            "Name": self.tr("Name"),
+            "Title": self.tr("Package title"),
+            "Branch": self.tr("Branch"),
+            "Url": self.tr("Repository URL"),
+            "SuggestRemoteName": self.tr("Repository name"),
+            "IsRuntime": self.tr("Is a runtime"),
+            "RuntimeRepo": self.tr("Obtained from")
         }
 
         self.info_containers = []
@@ -251,7 +251,7 @@ class FlatpakInstaller(QWidget):
         self.button_frame = QFrame(self)
         button_layout = QHBoxLayout(self.button_frame)
 
-        self.gpg_button = QPushButton(self.tr('Clave GPG'), self) 
+        self.gpg_button = QPushButton(self.tr('GPG Key'), self) 
         self.gpg_button.setFixedSize(100, 30)
         self.gpg_button.setStyleSheet("""
             QPushButton {
@@ -270,7 +270,7 @@ class FlatpakInstaller(QWidget):
 
         button_layout.addStretch()
 
-        self.cancel_button = QPushButton(self.tr('Cancelar'), self) 
+        self.cancel_button = QPushButton(self.tr('Cancel'), self) 
         self.cancel_button.setFixedSize(100, 30)
         self.cancel_button.setStyleSheet("""
             QPushButton {
@@ -288,7 +288,7 @@ class FlatpakInstaller(QWidget):
         button_layout.addWidget(self.cancel_button)
 
         if self.package_installed:
-            self.install_button = QPushButton(self.tr('Desinstalar'), self)  
+            self.install_button = QPushButton(self.tr('Uninstall'), self)  
             self.install_button.setFixedSize(100, 30)
             self.install_button.setStyleSheet("""
             QPushButton {
@@ -305,7 +305,7 @@ class FlatpakInstaller(QWidget):
         """)
             self.install_button.clicked.connect(self.start_uninstallation)
         else:
-            self.install_button = QPushButton(self.tr('Instalar'), self)  
+            self.install_button = QPushButton(self.tr('Install'), self)  
             self.install_button.setFixedSize(100, 30)
             self.install_button.setStyleSheet("""
             QPushButton {
@@ -335,7 +335,7 @@ class FlatpakInstaller(QWidget):
         main_layout.addWidget(self.install_output)
 
     def create_custom_title_bar(self, main_layout):
-        """Crea una barra de título personalizada."""
+        """Creates a custom title bar."""
         self.title_bar = QWidget(self)
         self.title_bar.setFixedHeight(40)  
         self.title_bar.setObjectName("title_bar")  
@@ -354,8 +354,8 @@ class FlatpakInstaller(QWidget):
                 background-color: transparent;
                 color: #BEBEBE;
                 font-size: 16px;
-                border: none; /* Eliminar borde */
-                border-radius: 0px; /* Eliminar bordes redondeados */
+                border: none;
+                border-radius: 0px;
             }
             QPushButton:hover {
                 background-color: #4A4A4A;
@@ -374,8 +374,8 @@ class FlatpakInstaller(QWidget):
                 background-color: transparent;
                 color: #BEBEBE;
                 font-size: 16px;
-                border: none; /* Eliminar borde */
-                border-radius: 0px; /* Eliminar bordes redondeados */
+                border: none;
+                border-radius: 0px;
             }
             QPushButton:hover {
                 background-color: #4A4A4A;
@@ -416,7 +416,7 @@ class FlatpakInstaller(QWidget):
                 config = json.load(config_file)
                 return config.get("language", "es")
         except (FileNotFoundError, json.JSONDecodeError):
-            print(self.tr("No se pudo cargar el archivo de configuración. Usando idioma predeterminado."))
+            print(self.tr("Could not load configuration file. Using default language."))
             return "en"
 
     def load_translations(self, language, translation_path=""):
@@ -426,14 +426,14 @@ class FlatpakInstaller(QWidget):
 
         if translator.load(locale_file):
             QApplication.instance().installTranslator(translator)
-            print(self.tr(f"Traducción cargada para el idioma: {language}"))
+            print(self.tr(f"Translation loaded for language: {language}"))
         else:
-            print(self.tr(f"No se pudo cargar la traducción para el idioma: {language} en la ruta: {translation_path}"))
+            print(self.tr(f"Could not load translation for language: {language} at path: {translation_path}"))
 
     def open_file_dialog(self):
         file_dialog = QFileDialog(self)
-        file_dialog.setWindowTitle(self.tr("Seleccionar archivo .flatpakref"))
-        file_dialog.setNameFilter(self.tr("Archivos Flatpak (*.flatpakref)"))
+        file_dialog.setWindowTitle(self.tr("Select .flatpakref file"))
+        file_dialog.setNameFilter(self.tr("Flatpak files (*.flatpakref)"))
         file_dialog.setFileMode(QFileDialog.ExistingFile)
 
         if file_dialog.exec_():
@@ -469,7 +469,7 @@ class FlatpakInstaller(QWidget):
             dialog = GPGKeyDialog(gpg_key, self)
             dialog.exec_()
         else:
-            QMessageBox.warning(self, self.tr("Clave GPG"), self.tr("No se encontró una clave GPG en el archivo."))
+            QMessageBox.warning(self, self.tr("GPG Key"), self.tr("No GPG key found in the file."))
 
     def start_installation(self):
         self.scroll_area.setVisible(False)
@@ -514,7 +514,7 @@ class FlatpakInstaller(QWidget):
 
     def installation_finished(self):
         self.progress_bar.setValue(100)
-        self.cancel_button.setText(self.tr('Finalizar'))
+        self.cancel_button.setText(self.tr('Finish'))
         self.cancel_button.setStyleSheet("""
             QPushButton {
                 background-color: #4CAF50;
@@ -532,7 +532,7 @@ class FlatpakInstaller(QWidget):
 
     def uninstallation_finished(self):
         self.progress_bar.setValue(100)
-        self.cancel_button.setText(self.tr('Finalizar'))
+        self.cancel_button.setText(self.tr('Finish'))
         self.cancel_button.setStyleSheet("""
             QPushButton {
                 background-color: #4CAF50;
@@ -553,11 +553,11 @@ class FlatpakInstaller(QWidget):
             self.process.terminate() 
 
         msg_box = QMessageBox(self)
-        msg_box.setWindowTitle(self.tr("Operación cancelada"))
-        msg_box.setText(self.tr("La operación ha sido cancelada."))
+        msg_box.setWindowTitle(self.tr("Operation cancelled"))
+        msg_box.setText(self.tr("The operation has been cancelled."))
         msg_box.setIcon(QMessageBox.Information)
 
-        close_button = QPushButton(self.tr("Cerrar"), self)
+        close_button = QPushButton(self.tr("Close"), self)
         close_button.setFixedSize(100, 30)
         close_button.setStyleSheet("""
             QPushButton {
@@ -583,7 +583,7 @@ class FlatpakInstaller(QWidget):
 if __name__ == '__main__':
     app = QApplication(sys.argv)
 
-    # Obtener el archivo .flatpakref como argumento
+    # Get the .flatpakref file as argument
     flatpakref_file = sys.argv[1] if len(sys.argv) > 1 else None
 
     installer = FlatpakInstaller(flatpakref_file)
