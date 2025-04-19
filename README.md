@@ -4,6 +4,8 @@
 
 Version Web de Flathub instalable que te permite instalar paquetes desde flathub con solo tocar el boton de instalar sin tener que bajar el archivo y instalarlo manual, solo con unos clicks y sin residuos, funciona en deepin os, debian, ubuntu , fuera de esas distros o basadas no doy soporte y no espere respuesta aunque seria facil portarlo a otros paquetes.
 
+Este no es paquete oficial de parte de flatpak o de flathub, puede ser considerado como un programa no oficial para acceder a flathub de forma más integrada con el escritorio.
+
 Ahora disponible solo para distribuciones basadas en debian.
 El paquete para arch/manjaro estara disponible pronto.
 
