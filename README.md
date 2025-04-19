@@ -18,4 +18,4 @@ The Arch/Manjaro package will be available soon.
 (Package) Create a Flatpak package and upload it to Flathub to make it more accessible from other distributions.
 
 ## Under the MIT license.
-Thanks to the support of the Deepin Spanish community and the Deepins team: https://github.com/deepin-espanol
+Thanks to the support of the Deepin Spanish community and the Deepines team: https://github.com/deepin-espanol
