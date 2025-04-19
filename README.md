@@ -1,4 +1,4 @@
-# Flathub Store UI
+# Flatpak Store UI
 
 ![imagen](https://github.com/user-attachments/assets/a8755a08-ec10-47e2-b9e2-7dfb48e416d3)
 
