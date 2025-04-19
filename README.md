@@ -2,23 +2,20 @@
 
 ![imagen](https://github.com/user-attachments/assets/a8755a08-ec10-47e2-b9e2-7dfb48e416d3)
 
-Web Version of Flathub (Installable)
+Installable web version of Flathub that allows you to install packages from Flathub by simply clicking the install button, without having to download the file and install it manually. It only takes a few clicks and no hassle. It works on Deepin OS, Debian, and Ubuntu. I don't provide support for those distros or based on these, and I don't expect a response, although it would be easy to port it to other packages.
 
-This allows you to install packages from Flathub with just a click on the install button—no need to download the file and install it manually. Just a few clicks, and no leftover files. It works on Deepin OS, Debian, and Ubuntu. For other distributions or non-Debian-based systems, I do not provide support, and you should not expect a response—though porting it to other packages would be easy.
+This is not an official package from Flatpak or Flathub. It can be considered an unofficial program to access Flathub in a more integrated way with the desktop.
 
-Note: This is not an official package from Flatpak or Flathub. It can be considered an unofficial program to access Flathub in a more desktop-integrated way.
+Now available only for Debian-based distributions.
+The Arch/Manjaro package will be available soon.
 
-Currently available only for Debian-based distributions.
-The package for Arch/Manjaro will be available soon.
+## Future options:
 
-# Future Features:
+(in progress) I will soon finish implementing the translations. Although the loading of translations and other tools has already been implemented, I plan to improve the process so that I don't have to translate the entire program bit by bit, and that it is done automatically.
 
-(In progress) Translations will be fully implemented very soon. Although translation loading is already set up, I plan to improve the process so translations can be added automatically instead of gradually translating the entire program.
+(Features) I will add new features to further integrate Flatpak options graphically.
 
-(Features) New features will be added to further integrate Flatpak options graphically.
+(Package) Create a Flatpak package and upload it to Flathub to make it more accessible from other distributions.
 
-(Package) I will create a Flatpak package and upload it to Flathub to make it more accessible across other distributions.
-
-# Licensed under MIT.
-Thanks to the support of the Deepin Spanish Community and the Deepines Team:
-https://github.com/deepin-espanol
+## Under the MIT license.
+Thanks to the support of the Deepin Spanish community and the Deepins team: https://github.com/deepin-espanol
