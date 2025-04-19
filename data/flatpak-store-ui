@@ -1,0 +1,1493 @@
+#!/usr/bin/env python3
+
+from PyQt6.QtCore import QUrl, QProcess, QTranslator, QLocale, QDir, Qt
+from PyQt6.QtGui import QIcon, QAction
+from PyQt6.QtWidgets import (
+    QMessageBox, QApplication, QMainWindow, QVBoxLayout, QWidget, QSizePolicy, QTextEdit, QPushButton, QDialog,
+    QToolBar, QFileDialog, QHBoxLayout, QLabel, QScrollArea, QFrame, QProgressBar
+)
+from PyQt6.QtWebEngineWidgets import QWebEngineView
+from PyQt6.QtWebEngineCore import QWebEngineProfile, QWebEngineSettings
+
+import shutil
+import sys
+import tempfile
+import urllib.request
+import webbrowser
+import json
+
+translation_path = "/usr/share/flatpak-store-ui/translations"
+
+def get_user_language():
+    locale = QLocale.system().name()
+    return locale
+
+class CustomTitleBarDialog(QDialog):
+    def __init__(self, title, parent=None):
+        super().__init__(parent)
+        self.setWindowTitle(title)
+        self.setWindowFlags(Qt.WindowType.FramelessWindowHint | Qt.WindowType.Window)
+        
+        self.setStyleSheet("""
+            QDialog {
+                background-color: #333333;
+                color: #ffffff;
+            }
+            QTextEdit, QPlainTextEdit {
+                background-color: #262626;
+                color: #ffffff;
+                border: 1px solid #444444;
+                border-radius: 4px;
+                padding: 5px;
+            }
+            QFrame {
+                background-color: #262626;
+                border-radius: 5px;
+            }
+            QLabel {
+                color: #ffffff;
+            }
+            QScrollArea {
+                background-color: transparent;
+                border: none;
+            }
+            QScrollBar:vertical {
+                border: none;
+                background: #2a2a2a;
+                width: 12px;
+                margin: 0px;
+                border-radius: 6px;
+            }
+            QScrollBar::handle:vertical {
+                background: #4a4a4a;
+                min-height: 30px;
+                border-radius: 6px;
+            }
+            QScrollBar::handle:vertical:hover {
+                background: #5a5a5a;
+            }
+            QScrollBar::add-line:vertical, QScrollBar::sub-line:vertical {
+                height: 0px;
+                background: none;
+            }
+            QScrollBar::add-page:vertical, QScrollBar::sub-page:vertical {
+                background: none;
+            }
+            QScrollBar:horizontal {
+                border: none;
+                background: #2a2a2a;
+                height: 12px;
+                margin: 0px;
+                border-radius: 6px;
+            }
+            QScrollBar::handle:horizontal {
+                background: #4a4a4a;
+                min-width: 30px;
+                border-radius: 6px;
+            }
+            QScrollBar::handle:horizontal:hover {
+                background: #5a5a5a;
+            }
+            QScrollBar::add-line:horizontal, QScrollBar::sub-line:horizontal {
+                width: 0px;
+                background: none;
+            }
+            QScrollBar::add-page:horizontal, QScrollBar::sub-page:horizontal {
+                background: none;
+            }
+        """)
+        
+        self.main_layout = QVBoxLayout(self)
+        self.main_layout.setContentsMargins(0, 0, 0, 0)
+        self.main_layout.setSpacing(0)
+        
+        self.create_custom_title_bar(title)
+        
+        self.content_widget = QWidget()
+        self.content_widget.setObjectName("content_widget")
+        self.content_widget.setStyleSheet("""
+            QWidget#content_widget {
+                background-color: #333333;
+                padding: 10px;
+            }
+        """)
+        
+        self.content_layout = QVBoxLayout(self.content_widget)
+        self.content_layout.setContentsMargins(10, 10, 10, 10)
+        
+        self.main_layout.addWidget(self.title_bar)
+        self.main_layout.addWidget(self.content_widget)
+        
+        self.dragging = False
+        self.offset = None
+    
+    def create_custom_title_bar(self, title):
+        self.title_bar = QWidget()
+        self.title_bar.setFixedHeight(40)
+        self.title_bar.setObjectName("title_bar")
+        self.title_bar.setStyleSheet("""
+            QWidget#title_bar {
+                background-color: #262626;
+                border-bottom: 1px solid #333333;
+            }
+        """)
+        
+        title_layout = QHBoxLayout(self.title_bar)
+        title_layout.setContentsMargins(10, 0, 10, 0)
+        title_layout.setSpacing(0)
+        
+        self.title_label = QLabel(title)
+        self.title_label.setStyleSheet("""
+            QLabel {
+                color: #BEBEBE;
+                font-size: 14px;
+                font-weight: bold;
+                padding-left: 5px;
+            }
+        """)
+        title_layout.addWidget(self.title_label)
+        
+        spacer = QWidget()
+        spacer.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Preferred)
+        title_layout.addWidget(spacer)
+        
+        self.close_button = QPushButton("✕")
+        self.close_button.setFixedSize(40, 40)
+        self.close_button.setStyleSheet("""
+            QPushButton {
+                background-color: transparent;
+                color: #BEBEBE;
+                font-size: 16px;
+                border: none;
+                border-radius: 0px;
+            }
+            QPushButton:hover {
+                background-color: #4A4A4A;
+            }
+            QPushButton:pressed {
+                background-color: #323232;
+            }
+        """)
+        self.close_button.clicked.connect(self.close)
+        title_layout.addWidget(self.close_button)
+    
+    def mousePressEvent(self, event):
+        if event.button() == Qt.MouseButton.LeftButton and self.title_bar.underMouse():
+            self.dragging = True
+            self.offset = event.globalPosition().toPoint() - self.pos()
+
+    def mouseMoveEvent(self, event):
+        if self.dragging:
+            self.move(event.globalPosition().toPoint() - self.offset)
+
+    def mouseReleaseEvent(self, event):
+        if event.button() == Qt.MouseButton.LeftButton:
+            self.dragging = False
+
+class CommandOutput(CustomTitleBarDialog):
+    def __init__(self, title, content, process=None, is_process=False, parent=None):
+        super().__init__(title, parent)
+        self.resize(650, 400)
+        
+        self.text_edit = QTextEdit(self)
+        self.text_edit.setReadOnly(True)
+        self.text_edit.setPlainText(content)
+        self.text_edit.setStyleSheet("""
+            QTextEdit {
+                background-color: #1e1e1e;
+                color: #e0e0e0;
+                font-family: 'Monospace';
+                font-size: 12px;
+                border: 1px solid #444;
+                border-radius: 4px;
+                padding: 8px;
+            }
+        """)
+        
+        frame = QFrame(self)
+        frame_layout = QVBoxLayout(frame)
+        frame_layout.addWidget(self.text_edit)
+        
+        self.content_layout.addWidget(frame, stretch=1)
+
+        self.button_container = QWidget()
+        self.button_layout = QHBoxLayout(self.button_container)
+        self.button_layout.setContentsMargins(0, 10, 0, 0)
+        
+        self.action_button = QPushButton(self.tr("Cancelar"), self)
+        self.action_button.setStyleSheet("""
+            QPushButton {
+                background-color: #FF5C5C;
+                border-radius: 8px;
+                color: white;
+                font-weight: bold;
+                padding: 5px 15px;
+                min-width: 100px;
+                font-size: 14px;
+            }
+            QPushButton:hover {
+                background-color: #FF2D2D;
+            }
+            QPushButton:pressed {
+                background-color: #D43F3F;
+            }
+        """)
+        
+        self.close_button = QPushButton(self.tr("Finalizar"), self)
+        self.close_button.setStyleSheet("""
+            QPushButton {
+                background-color: #4CAF50;
+                border-radius: 8px;
+                color: white;
+                font-weight: bold;
+                padding: 5px 15px;
+                min-width: 100px;
+                font-size: 14px;
+            }
+            QPushButton:hover {
+                background-color: #45a049;
+            }
+            QPushButton:pressed {
+                background-color: #3d8b40;
+            }
+        """)
+        self.close_button.hide()
+        self.close_button.clicked.connect(self.close)
+        
+        self.button_layout.addStretch()
+        self.button_layout.addWidget(self.action_button)
+        self.button_layout.addWidget(self.close_button)
+        self.button_layout.addStretch()
+        
+        self.content_layout.addWidget(self.button_container)
+
+        self.is_process = is_process
+        self.process = process
+
+        if self.is_process and self.process:
+            self.action_button.clicked.connect(self.cancel_process)
+            self.process.finished.connect(self.on_process_finished)
+        else:
+            self.action_button.setText(self.tr("Cerrar"))
+            self.action_button.clicked.connect(self.close)
+
+    def cancel_process(self):
+        if self.process:
+            self.process.terminate()
+            self.process.waitForFinished()
+            self.text_edit.append(self.tr("\nProceso cancelado por el usuario."))
+            self.switch_to_finalize_button()
+
+    def on_process_finished(self):
+        output = self.process.readAllStandardOutput().data().decode()
+        if output:
+            self.text_edit.append(output)
+        self.switch_to_finalize_button()
+
+    def switch_to_finalize_button(self):
+        self.action_button.hide()
+        self.close_button.show()
+
+class InstalledAppsDialog(CustomTitleBarDialog):
+    def __init__(self, parent=None):
+        super().__init__(parent.tr('Aplicaciones Flatpak Instaladas'), parent)
+        self.resize(650, 450)
+
+        self.content_widget.setStyleSheet("""
+            QWidget#content_widget {
+                background-color: #333333;
+            }
+            QScrollArea {
+                background-color: #333333;
+                border: none;
+            }
+            QScrollBar:vertical {
+                background: #2a2a2a;
+                width: 10px;
+                margin: 0px;
+            }
+            QScrollBar::handle:vertical {
+                background: #444444;
+                min-height: 20px;
+                border-radius: 4px;
+            }
+            QScrollBar::add-line:vertical, QScrollBar::sub-line:vertical {
+                background: none;
+            }
+        """)
+
+        self.nav_bar = QHBoxLayout()
+
+        self.label_category = QLabel(self.tr("Filtrar lista por:"), self)
+        self.label_category.setStyleSheet("QLabel { font-size: 12px; color: #48c0d5; margin-left: 10px; }")
+        self.nav_bar.addWidget(self.label_category)
+
+        self.button_system = QPushButton(self.tr("Sistema"), self)
+        self.button_system.setFixedSize(100, 30)
+        self.button_system.setStyleSheet("""
+            QPushButton {
+                background-color: #d9534f;  
+                border-radius: 5px;
+                color: #ffffff;
+                font-size: 12px;
+                font-weight: bold;
+                padding: 5px;
+            }
+            QPushButton:hover {
+                background-color: #993e3b;  
+            }
+        """)
+        self.button_system.clicked.connect(lambda: self.filter_apps("system"))
+        self.nav_bar.addWidget(self.button_system)
+
+        self.button_user = QPushButton(self.tr("Usuario"), self)
+        self.button_user.setFixedSize(100, 30)
+        self.button_user.setStyleSheet("""
+            QPushButton {
+                background-color: #66b3ff;  
+                border-radius: 5px;
+                color: #ffffff;
+                font-size: 12px;
+                font-weight: bold;
+                padding: 5px;
+            }
+            QPushButton:hover {
+                background-color: #88a9b4;  
+            }
+        """)
+        self.button_user.clicked.connect(lambda: self.filter_apps("user"))
+        self.nav_bar.addWidget(self.button_user)
+
+        spacer = QWidget()
+        spacer.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Preferred)
+        self.nav_bar.addWidget(spacer)
+
+        self.content_layout.addLayout(self.nav_bar)
+
+        self.scroll_area = QScrollArea(self)
+        self.scroll_area.setWidgetResizable(True)
+        self.scroll_area.setStyleSheet("background-color: #333333; border: none;")
+
+        self.scroll_content = QWidget(self.scroll_area)
+        self.scroll_content.setObjectName("scrollContent")
+        self.scroll_content.setStyleSheet("QWidget#scrollContent { background-color: #333333; }")
+        
+        self.scroll_layout = QVBoxLayout(self.scroll_content)
+        self.scroll_layout.setContentsMargins(5, 5, 5, 5)
+        self.scroll_layout.setSpacing(10)
+
+        self.scroll_area.setWidget(self.scroll_content)
+        self.content_layout.addWidget(self.scroll_area)
+
+        self.button_close = QPushButton(self.tr("Cerrar"), self)
+        self.button_close.setStyleSheet("""
+            QPushButton {
+                background-color: #4CAF50;
+                border-radius: 8px;
+                color: white;
+                font-weight: bold;
+                padding: 5px 15px;
+                min-width: 100px;
+                font-size: 14px;
+            }
+            QPushButton:hover {
+                background-color: #45a049;
+            }
+            QPushButton:pressed {
+                background-color: #3d8b40;
+            }
+        """)
+        self.button_close.clicked.connect(self.close)
+        self.content_layout.addWidget(self.button_close)
+
+        self.all_apps = self.load_all_apps()
+        self.filter_apps("system")
+
+    def load_all_apps(self):
+        user_process = QProcess()
+        user_process.start("flatpak", ["list", "--user", "--columns=application,installation"])
+        user_process.waitForFinished()
+        user_output = user_process.readAllStandardOutput().data().decode().strip().splitlines()
+
+        system_process = QProcess()
+        system_process.start("flatpak", ["list", "--system", "--columns=application,installation"])
+        system_process.waitForFinished()
+        system_output = system_process.readAllStandardOutput().data().decode().strip().splitlines()
+
+        all_apps = user_output + system_output
+        return all_apps
+
+    def filter_apps(self, category):
+        for i in reversed(range(self.scroll_layout.count())):
+            widget = self.scroll_layout.itemAt(i).widget()
+            if widget:
+                widget.deleteLater()
+
+        container = QWidget()
+        container_layout = QVBoxLayout(container)
+        container_layout.setContentsMargins(0, 0, 0, 0)
+        container_layout.setSpacing(10)
+
+        for app_info in self.all_apps:
+            if not app_info.strip():
+                continue
+                
+            try:
+                app_name, installation_type = app_info.split("\t")
+            except ValueError:
+                continue
+
+            if category == "all" or (category == "system" and installation_type == "system") or (category == "user" and installation_type == "user"):
+                frame = QFrame()
+                frame.setFixedHeight(70) 
+                frame.setMinimumWidth(600)  
+                frame.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Fixed)
+                frame.setObjectName("appFrame")
+                frame.setStyleSheet("""
+                    QFrame#appFrame {
+                        background-color: #3a3a3a;
+                        border-radius: 8px;
+                        border: 1px solid #444444;
+                    }
+                """)
+
+                app_layout = QHBoxLayout(frame)
+                app_layout.setContentsMargins(12, 8, 12, 8)
+
+                app_label = QLabel(f"{app_name}\n<small>({'Usuario' if installation_type == 'user' else 'Sistema'})</small>")
+                app_label.setStyleSheet("""
+                    QLabel {
+                        color: #ffffff;
+                        font-size: 14px;
+                        font-weight: bold;
+                        min-width: 300px;
+                    }
+                """)
+                app_label.setTextFormat(Qt.TextFormat.RichText)
+                app_label.setWordWrap(True)
+                app_layout.addWidget(app_label, stretch=1)
+
+                info_button = QPushButton(self.tr("Información"))
+                info_button.setFixedSize(100, 30)
+                info_button.setStyleSheet("""
+                    QPushButton {
+                        background-color: #5bc0de;
+                        color: white;
+                        border-radius: 5px;
+                        font-size: 12px;
+                    }
+                    QPushButton:hover {
+                        background-color: #46b8da;
+                    }
+                """)
+                info_button.clicked.connect(lambda _, name=app_name: self.show_app_info(name))
+                app_layout.addWidget(info_button)
+
+                uninstall_button = QPushButton(self.tr("Desinstalar"))
+                uninstall_button.setFixedSize(100, 30)
+                uninstall_button.setStyleSheet("""
+                    QPushButton {
+                        background-color: #d9534f;
+                        color: white;
+                        border-radius: 5px;
+                        font-size: 12px;
+                    }
+                    QPushButton:hover {
+                        background-color: #c9302c;
+                    }
+                """)
+                uninstall_button.clicked.connect(lambda _, name=app_name, install_type=installation_type: self.uninstall_app(name, install_type))
+                app_layout.addWidget(uninstall_button)
+
+                container_layout.addWidget(frame)
+
+        self.scroll_layout.addWidget(container)
+
+    def uninstall_app(self, app_name, installation_type):
+        self.uninstall_process = QProcess()
+        self.output_window = CommandOutput(
+            self.tr("Desinstalando..."), 
+            self.tr(f"Iniciando desinstalación de {app_name}...\n"), 
+            process=self.uninstall_process, 
+            is_process=True, 
+            parent=self
+        )
+        self.output_window.show()
+        
+        self.uninstall_process.setProcessChannelMode(QProcess.ProcessChannelMode.MergedChannels)
+        self.uninstall_process.readyReadStandardOutput.connect(
+            lambda: self.output_window.text_edit.append(
+                self.uninstall_process.readAllStandardOutput().data().decode()
+            )
+        )
+        self.uninstall_process.finished.connect(
+            lambda exit_code, exit_status: self.on_uninstall_finished(app_name, installation_type)
+        )
+
+        if installation_type == "user":
+            self.uninstall_process.start("flatpak", ["uninstall", "--user", "-y", app_name])
+        else:
+            self.uninstall_process.start("flatpak", ["uninstall", "--system", "-y", app_name])
+
+    def on_uninstall_finished(self, app_name, installation_type):
+        self.all_apps = self.load_all_apps()
+        self.filter_apps("all")
+        
+        self.output_window.text_edit.append("\nDesinstalación completada.")
+        self.output_window.switch_to_finalize_button()
+
+    def show_app_info(self, app_name):
+        info_process = QProcess()
+        info_process.start("flatpak", ["info", app_name])
+        info_process.waitForFinished()
+        info_output = info_process.readAllStandardOutput().data().decode()
+        
+        if info_output.strip():  
+            info_window = CommandOutput(f'App: {app_name}', info_output, parent=self)
+            info_window.setWindowModality(Qt.WindowModality.ApplicationModal)
+            info_window.show()
+        else:
+            library_window = CustomTitleBarDialog(self.tr(f'Información: {app_name}'), self)
+            library_window.resize(500, 200)  
+            
+            container = QWidget()
+            container.setStyleSheet("background-color: #333333;")
+            layout = QVBoxLayout(container)
+            layout.setContentsMargins(20, 20, 20, 20)
+            layout.setSpacing(15)
+            
+            message = QLabel(self.tr("""
+                <p style='font-size: 14px;'>Esto paquete flatpak no es una app, es una librería o </p>
+                <p style='font-size: 14px;'>biblioteca requerida por otra app o perteneciente</p>
+                <p style='font-size: 14px;'> a un conjunto de librerias instaladas automáticamente</p>
+                <p style='font-size: 14px;'> o manualmente.</p>
+                <p style='font-size: 14px; margin-top: 10px;'>Si ya no requiere de su uso puede eliminarla.</p>
+            """))
+            message.setAlignment(Qt.AlignmentFlag.AlignCenter)
+            message.setStyleSheet("""
+                QLabel {
+                    color: #ffffff;
+                }
+            """)
+            message.setTextFormat(Qt.TextFormat.RichText)
+            
+            close_button = QPushButton(self.tr("Cerrar"))
+            close_button.setFixedSize(100, 30)
+            close_button.setStyleSheet("""
+                QPushButton {
+                    background-color: #4CAF50;
+                    border-radius: 8px;
+                    color: white;
+                    font-weight: bold;
+                    padding: 5px 15px;
+                    min-width: 100px;
+                    font-size: 14px;
+                }
+                QPushButton:hover {
+                    background-color: #45a049;
+                }
+                QPushButton:pressed {
+                    background-color: #3d8b40;
+                }
+            """)
+            close_button.clicked.connect(library_window.close)
+            
+            layout.addWidget(message)
+            layout.addWidget(close_button, 0, Qt.AlignmentFlag.AlignCenter)
+            
+            library_window.content_layout.addWidget(container)
+            
+            library_window.setWindowModality(Qt.WindowModality.ApplicationModal)
+            library_window.show()
+
+class RepairProgressDialog(CustomTitleBarDialog):
+    def __init__(self, parent=None):
+        super().__init__(parent.tr('Reparación de Flatpak'), parent)
+        self.resize(600, 450)
+
+        self.progress_bar = QProgressBar(self)
+        self.content_layout.addWidget(self.progress_bar)
+        self.text_edit = QTextEdit(self)
+        self.text_edit.setReadOnly(True)
+        self.content_layout.addWidget(self.text_edit)
+
+        self.button_cancel = QPushButton(self.tr("Cancelar"), self)
+        self.button_cancel.setStyleSheet("""
+            QPushButton {
+                background-color: #FF5C5C;
+                border-radius: 8px;
+                color: white;
+                font-weight: bold;
+                padding: 5px 15px;
+            }
+            QPushButton:hover {
+                background-color: #FF2D2D;
+            }
+        """)
+        self.button_cancel.clicked.connect(self.cancel_repair_process)
+        self.content_layout.addWidget(self.button_cancel)
+
+        self.button_finalize = QPushButton(self.tr("Finalizar"), self)
+        self.button_finalize.setStyleSheet("""
+            QPushButton {
+                background-color: #4CAF50;
+                border-radius: 8px;
+                color: white;
+                font-weight: bold;
+                padding: 5px 15px;
+            }
+            QPushButton:hover {
+                background-color: #45a049;
+            }
+        """)
+        self.button_finalize.clicked.connect(self.close)
+        self.button_finalize.hide()
+        self.content_layout.addWidget(self.button_finalize)
+        self.repair_process = None
+
+    def set_repair_process(self, process):
+        self.repair_process = process
+
+    def cancel_repair_process(self):
+        if self.repair_process:
+            self.repair_process.terminate()
+            self.repair_process.waitForFinished()
+            self.text_edit.append(self.tr("Reparación cancelada."))
+        self.switch_to_finalize_button()
+
+    def switch_to_finalize_button(self):
+        self.button_cancel.hide()
+        self.button_finalize.show()
+
+class AboutDialog(CustomTitleBarDialog):
+    def __init__(self, parent=None):
+        super().__init__(parent.tr('Acerca de Flatpak Store Ui'), parent)
+        self.resize(410, 450)  
+        
+        self.content_widget.setStyleSheet("""
+            QWidget#content_widget {
+                background-color: #2a2a2a;
+                padding: 15px;
+            }
+            QLabel {
+                color: #e0e0e0;
+                font-size: 13px;
+                padding: 3px 0;
+            }
+            QPushButton {
+                background-color: #4CAF50;
+                border-radius: 6px;
+                color: white;
+                font-weight: bold;
+                padding: 5px 20px;
+                min-width: 100px;
+                font-size: 13px;
+                margin-top: 15px;
+            }
+            QPushButton:hover {
+                background-color: #45a049;
+            }
+        """)
+
+        main_container = QWidget()
+        main_layout = QVBoxLayout(main_container)
+        main_layout.setContentsMargins(5, 5, 5, 5)
+        main_layout.setSpacing(8)
+        
+        title_label = QLabel(self.tr("Flatpak Store UI"))
+        title_label.setStyleSheet("""
+            QLabel {
+                font-size: 18px;
+                font-weight: bold;
+                color: #4CAF50;
+                padding-bottom: 10px;
+            }
+        """)
+        title_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        main_layout.addWidget(title_label)
+
+        separator = QFrame()
+        separator.setFrameShape(QFrame.Shape.HLine)
+        separator.setStyleSheet("color: #444;")
+        main_layout.addWidget(separator)
+
+        version_info = QVBoxLayout()
+        version_info.setSpacing(5)
+        
+        flatpak_version = self.get_flatpak_version()
+        flatpak_label = QLabel(f"<b>Flatpak Versión:</b> {flatpak_version}")
+        app_count = self.get_installed_app_count()
+        app_count_label = QLabel(f"<b>Aplicaciones instaladas (sistema):</b> {app_count}")
+        version_label = QLabel("<b>Versión de la app:</b> 1.6.0")
+        
+        for label in [flatpak_label, app_count_label, version_label]:
+            label.setTextFormat(Qt.TextFormat.RichText)
+            version_info.addWidget(label)
+        
+        main_layout.addLayout(version_info)
+
+        dev_info = QVBoxLayout()
+        dev_info.setSpacing(5)
+        
+        creator_label = QLabel("<b>Desarrollado por:</b> krafairus")
+        licence_label = QLabel("<b>Licencia:</b> MIT")
+        url_label = QLabel('<b>GitHub:</b> <a href="https://github.com/krafairus/flatpak-store-ui" style="color: #4CAF50;">github.com/krafairus/flatpak-store-ui</a>')
+        url_label.setOpenExternalLinks(True)
+        
+        for label in [creator_label, licence_label, url_label]:
+            label.setTextFormat(Qt.TextFormat.RichText)
+            dev_info.addWidget(label)
+        
+        main_layout.addLayout(dev_info)
+
+        notes = QVBoxLayout()
+        notes.setSpacing(5)
+        
+        note1_label = QLabel("• Este software no está afiliado a Flathub ni a flatseal.")
+        note2_label = QLabel("• No proporcionamos ningún programa alojado en Flathub.")
+        
+        for label in [note1_label, note2_label]:
+            notes.addWidget(label)
+        
+        main_layout.addLayout(notes)
+
+        thanks = QVBoxLayout()
+        thanks.setSpacing(5)
+        
+        thanks_label = QLabel("<b>Agradecimientos a:</b>")
+        team_url = QLabel('<b>Equipo de Deepin en Español:</b> <a href="https://deepinenespañol.org" style="color: #4CAF50;">deepinenespañol.org</a>')
+        team_url.setOpenExternalLinks(True)
+        
+        thanks_label.setTextFormat(Qt.TextFormat.RichText)
+        thanks.addWidget(thanks_label)
+        thanks.addWidget(team_url)
+        
+        main_layout.addLayout(thanks)
+
+        main_layout.addStretch()
+
+        button_container = QWidget()
+        button_layout = QHBoxLayout(button_container)
+        button_layout.setContentsMargins(0, 0, 0, 0)
+        
+        close_button = QPushButton(self.tr("Cerrar"))
+        close_button.clicked.connect(self.close)
+        button_layout.addStretch()
+        button_layout.addWidget(close_button)
+        button_layout.addStretch()
+        
+        main_layout.addWidget(button_container)
+
+        self.content_layout.addWidget(main_container)
+
+    def get_flatpak_version(self):
+        process = QProcess()
+        process.start("flatpak", ["--version"])
+        process.waitForFinished()
+        version = process.readAllStandardOutput().data().decode().strip()
+        return version
+
+    def get_installed_app_count(self):
+        process = QProcess()
+        process.start("flatpak", ["list", "--system", "--columns=application"])  
+        process.waitForFinished()
+        output = process.readAllStandardOutput().data().decode().strip().splitlines()
+        return len(output)
+
+class PythonWebView(QMainWindow):
+    def __init__(self):
+        super().__init__()
+        self.setWindowTitle('Flatpak Store')
+        self.setWindowIcon(QIcon('/usr/share/icons/hicolor/scalable/apps/flatpak-store-ui'))
+        self.resize(1000, 600)
+
+        self.setWindowFlags(Qt.WindowType.FramelessWindowHint)
+
+        self.setStyleSheet("""
+            QMainWindow {
+                background-color: #333333;
+            }
+            QToolTip {
+                color: #ffffff;
+                background-color: #333333;
+                border: 1px solid #444444;
+                padding: 2px;
+                border-radius: 3px;
+            }
+        """)
+
+        self.create_custom_title_bar()
+
+        self.central_widget = QWidget(self)
+        self.setCentralWidget(self.central_widget)
+        self.layout = QVBoxLayout(self.central_widget)
+        self.layout.setContentsMargins(0, 0, 0, 0)
+        self.layout.setSpacing(0)
+
+        self.wview = QWebEngineView(self)
+        self.wview.setStyleSheet("border: none; margin: 0; padding: 0;")
+
+        profile = QWebEngineProfile.defaultProfile()
+        
+        profile = QWebEngineProfile.defaultProfile()
+        custom_user_agent = "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36"
+        profile.setHttpUserAgent(custom_user_agent)
+        
+        self.wview.page().loadFinished.connect(self.inject_scrollbar_styles)
+        
+        settings = self.wview.settings()
+        
+        if hasattr(QWebEngineSettings.WebAttribute, 'ForceDarkMode'):
+            settings.setAttribute(QWebEngineSettings.WebAttribute.ForceDarkMode, True)
+        
+        profile.setPersistentCookiesPolicy(QWebEngineProfile.PersistentCookiesPolicy.AllowPersistentCookies)
+        
+        profile.setHttpAcceptLanguage("es-ES,es;q=0.9")
+
+        self.wview.load(QUrl('https://flathub.org/es'))
+        self.wview.page().profile().downloadRequested.connect(self.download_requested)
+        self.layout.addWidget(self.wview)
+        
+        self.wview.urlChanged.connect(self.update_back_button)
+        
+        self.wview.page().loadFinished.connect(self.set_dark_mode_preference)
+
+        self.local_install_process = None
+
+    def inject_scrollbar_styles(self, ok):
+        if ok:
+            scrollbar_css = """
+            ::-webkit-scrollbar {
+                width: 12px;
+                background-color: #2a2a2a;
+                border-radius: 6px;
+            }
+            
+            ::-webkit-scrollbar-track {
+                background-color: #2a2a2a;
+                border-radius: 6px;
+            }
+            
+            ::-webkit-scrollbar-thumb {
+                background-color: #4a4a4a;
+                border-radius: 6px;
+                min-height: 30px;
+            }
+            
+            ::-webkit-scrollbar-thumb:hover {
+                background-color: #5a5a5a;
+            }
+            
+            ::-webkit-scrollbar:horizontal {
+                height: 12px;
+                background-color: #2a2a2a;
+                border-radius: 6px;
+            }
+            
+            ::-webkit-scrollbar-thumb:horizontal {
+                background-color: #4a4a4a;
+                min-width: 30px;
+                border-radius: 6px;
+            }
+            
+            ::-webkit-scrollbar-thumb:horizontal:hover {
+                background-color: #5a5a5a;
+            }
+            """
+            
+            self.wview.page().runJavaScript(f"""
+                var style = document.createElement('style');
+                style.type = 'text/css';
+                style.innerHTML = `{scrollbar_css}`;
+                document.head.appendChild(style);
+            """)
+
+    def set_dark_mode_preference(self, ok):
+        if ok:
+            js = """
+            const darkModeMediaQuery = window.matchMedia('(prefers-color-scheme: dark)');
+            darkModeMediaQuery.matches = true;
+            darkModeMediaQuery.dispatchEvent(new Event('change'));
+            document.documentElement.style.setProperty('color-scheme', 'dark');
+            """
+            
+            self.wview.page().runJavaScript(js)
+
+    def open_flatseal(self):
+        check_process = QProcess()
+        check_process.start("flatpak", ["list", "--columns=application"])
+        check_process.waitForFinished()
+        installed_apps = check_process.readAllStandardOutput().data().decode().strip().splitlines()
+        
+        if "com.github.tchx84.Flatseal" in installed_apps:
+            process = QProcess()
+            process.startDetached("flatpak", ["run", "com.github.tchx84.Flatseal"])
+        else:
+            self.show_flatseal_install_dialog()
+
+    def show_flatseal_install_dialog(self):
+        self.install_dialog = CustomTitleBarDialog(self.tr("Flatseal no instalado"), self)
+        self.install_dialog.resize(500, 240)
+        
+        content = QWidget()
+        layout = QVBoxLayout(content)
+        
+        message = QLabel(self.tr("""
+            <p style='font-size: 14px;'>Flatseal no está instalado en su sistema.</p>
+            <p style='font-size: 14px;'>Flatseal es una herramienta gráfica para gestionar permisos de aplicaciones Flatpak.</p>
+            <p style='font-size: 14px; margin-top: 15px;'>¿Desea instalarlo ahora?</p>
+        """))
+        message.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        message.setWordWrap(True)
+        message.setStyleSheet("color: #ffffff;")
+        layout.addWidget(message)
+        
+        button_container = QWidget()
+        button_layout = QHBoxLayout(button_container)
+        
+        cancel_button = QPushButton(self.tr("Cancelar"))
+        cancel_button.setStyleSheet("""
+            QPushButton {
+                background-color: #FF5C5C;
+                border-radius: 8px;
+                color: white;
+                font-weight: bold;
+                padding: 5px 15px;
+                min-width: 100px;
+                font-size: 14px;
+            }
+            QPushButton:hover {
+                background-color: #FF2D2D;
+            }
+            QPushButton:pressed {
+                background-color: #D43F3F;
+            }
+        """)
+        cancel_button.clicked.connect(self.install_dialog.close)
+        
+        install_button = QPushButton(self.tr("Instalar"))
+        install_button.setStyleSheet("""
+            QPushButton {
+                background-color: #4CAF50;
+                border-radius: 8px;
+                color: white;
+                font-weight: bold;
+                padding: 5px 15px;
+                min-width: 100px;
+                font-size: 14px;
+            }
+            QPushButton:hover {
+                background-color: #45a049;
+            }
+            QPushButton:pressed {
+                background-color: #3d8b40;
+            }
+        """)
+        install_button.clicked.connect(self.start_flatseal_installation)
+        
+        button_layout.addStretch()
+        button_layout.addWidget(cancel_button)
+        button_layout.addWidget(install_button)
+        button_layout.addStretch()
+        
+        layout.addWidget(button_container)
+        self.install_dialog.content_layout.addWidget(content)
+        self.install_dialog.exec()
+
+    def start_flatseal_installation(self):
+        self.install_dialog.close()
+        
+        self.install_window = QDialog(self)
+        self.install_window.setWindowFlags(Qt.WindowType.FramelessWindowHint)
+        self.install_window.setModal(True)
+        self.install_window.setStyleSheet("""
+            QDialog {
+                background-color: #333333;
+                border: 1px solid #444444;
+                border-radius: 5px;
+            }
+        """)
+        
+        layout = QVBoxLayout(self.install_window)
+        layout.setContentsMargins(10, 10, 10, 10)
+        
+        self.flatseal_output = QTextEdit()
+        self.flatseal_output.setReadOnly(True)
+        self.flatseal_output.setStyleSheet("""
+            QTextEdit {
+                background-color: #1e1e1e;
+                color: #e0e0e0;
+                font-family: 'Monospace';
+                font-size: 12px;
+                border: 1px solid #444;
+                border-radius: 4px;
+                padding: 8px;
+            }
+        """)
+        layout.addWidget(self.flatseal_output)
+        
+        self.cancel_button = QPushButton(self.tr("Cancelar"))
+        self.cancel_button.setStyleSheet("""
+            QPushButton {
+                background-color: #FF5C5C;
+                border-radius: 8px;
+                color: white;
+                font-weight: bold;
+                padding: 5px 15px;
+                min-width: 100px;
+                font-size: 14px;
+            }
+            QPushButton:hover {
+                background-color: #FF2D2D;
+            }
+            QPushButton:pressed {
+                background-color: #D43F3F;
+            }
+        """)
+        layout.addWidget(self.cancel_button, 0, Qt.AlignmentFlag.AlignCenter)
+        
+        self.accept_button = QPushButton(self.tr("Aceptar"))
+        self.accept_button.setStyleSheet("""
+            QPushButton {
+                background-color: #4CAF50;
+                border-radius: 8px;
+                color: white;
+                font-weight: bold;
+                padding: 5px 15px;
+                min-width: 100px;
+                font-size: 14px;
+            }
+            QPushButton:hover {
+                background-color: #45a049;
+            }
+            QPushButton:pressed {
+                background-color: #3d8b40;
+            }
+        """)
+        self.accept_button.hide()
+        self.accept_button.clicked.connect(self.install_window.close)
+        layout.addWidget(self.accept_button, 0, Qt.AlignmentFlag.AlignCenter)
+        
+        self.install_window.resize(600, 400)
+        self.install_window.show()
+        
+        self.flatseal_output.append(self.tr("Iniciando instalación de Flatseal..."))
+        
+        self.flatseal_process = QProcess()
+        self.flatseal_process.setProcessChannelMode(QProcess.ProcessChannelMode.MergedChannels)
+        
+        self.flatseal_process.readyReadStandardOutput.connect(
+            lambda: self.flatseal_output.append(
+                self.flatseal_process.readAllStandardOutput().data().decode().strip())
+        )
+        self.flatseal_process.finished.connect(
+            lambda exit_code, exit_status: self.on_flatseal_installation_finished(exit_code, exit_status)
+        )
+        
+        self.cancel_button.clicked.connect(self.cancel_flatseal_installation)
+        
+        self.flatseal_process.start("flatpak", ["install", "flatpak", "com.github.tchx84.Flatseal", "-y", "--system"])
+
+    def cancel_flatseal_installation(self):
+        if self.flatseal_process and self.flatseal_process.state() == QProcess.ProcessState.Running:
+            self.flatseal_process.terminate()
+            self.flatseal_process.waitForFinished()
+            self.flatseal_output.append(self.tr("\nInstalación cancelada por el usuario."))
+            self.cancel_button.hide()
+            self.accept_button.show()
+
+    def on_flatseal_installation_finished(self, exit_code, exit_status):
+        if exit_code == 0 and exit_status == QProcess.ExitStatus.NormalExit:
+            self.flatseal_output.append(self.tr("\nInstalación completada correctamente."))
+        else:
+            error = self.flatseal_process.readAllStandardError().data().decode()
+            self.flatseal_output.append(self.tr("\nError durante la instalación:"))
+            self.flatseal_output.append(error)
+        
+        self.cancel_button.hide()
+        self.accept_button.show()
+        
+
+    def create_custom_title_bar(self):
+        self.title_bar = QWidget(self)
+        self.title_bar.setFixedHeight(40)
+        self.title_bar.setObjectName("title_bar")
+        self.title_bar.setStyleSheet("""
+            QWidget#title_bar {
+                background-color: #262626;
+                border-bottom: 1px solid #333333;
+            }
+        """)
+
+        title_layout = QHBoxLayout(self.title_bar)
+        title_layout.setContentsMargins(10, 0, 10, 0)
+        title_layout.setSpacing(0)
+
+        self.create_icon_button(
+            self.tr("Inicio flatpak"), 
+            "/usr/share/flatpak-store-ui/icons/home.png", 
+            self.go_home, title_layout)
+        self.button_back = self.create_icon_button(
+            self.tr("Volver"), 
+            "/usr/share/flatpak-store-ui/icons/back.png", 
+            self.go_back, title_layout, enable=False)
+        self.create_icon_button(
+            self.tr("Gestionar apps"), 
+            "/usr/share/flatpak-store-ui/icons/applications.png", 
+            self.show_installed_apps, title_layout)
+        self.create_icon_button(
+            self.tr("Actualizar Apps"), 
+            "/usr/share/flatpak-store-ui/icons/update.png", 
+            self.update_flatpaks, title_layout)
+        self.create_icon_button(
+            self.tr("Historial de operaciones recientes"), 
+            "/usr/share/flatpak-store-ui/icons/history.png", 
+            self.show_history, title_layout)
+        self.create_icon_button(
+            self.tr("Reparar Paquetes"), 
+            "/usr/share/flatpak-store-ui/icons/repair.png", 
+            self.repair_flatpak, title_layout)
+        self.create_icon_button(
+            self.tr("Configurar permisos (Flatseal)"), 
+            "/usr/share/flatpak-store-ui/icons/com.github.tchx84.Flatseal.svg",
+            self.open_flatseal, 
+            title_layout)
+        self.create_icon_button(
+            self.tr("Instalar .flatpak"), 
+            "/usr/share/flatpak-store-ui/icons/local.png", 
+            self.install_local_flatpak, title_layout)
+        self.create_icon_button(
+            self.tr("Acerca de"), 
+            "/usr/share/flatpak-store-ui/icons/about.png", 
+            self.show_about, title_layout)
+
+        spacer = QWidget()
+        spacer.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Preferred)
+        title_layout.addWidget(spacer)
+
+        minimize_button = QPushButton("─")
+        minimize_button.setFixedSize(40, 40)
+        minimize_button.setStyleSheet("""
+            QPushButton {
+                background-color: transparent;
+                color: #BEBEBE;
+                font-size: 16px;
+                border: none;
+                border-radius: 0px;
+            }
+            QPushButton:hover {
+                background-color: #4A4A4A;
+            }
+            QPushButton:pressed {
+                background-color: #323232;
+            }
+        """)
+        minimize_button.clicked.connect(self.showMinimized)
+        title_layout.addWidget(minimize_button)
+
+        close_button = QPushButton("✕")
+        close_button.setFixedSize(40, 40)
+        close_button.setStyleSheet("""
+            QPushButton {
+                background-color: transparent;
+                color: #BEBEBE;
+                font-size: 16px;
+                border: none;
+                border-radius: 0px;
+            }
+            QPushButton:hover {
+                background-color: #4A4A4A;
+            }
+            QPushButton:pressed {
+                background-color: #323232;
+            }
+        """)
+        close_button.clicked.connect(self.close)
+        title_layout.addWidget(close_button)
+
+        self.setMenuWidget(self.title_bar)
+
+        self.dragging = False
+        self.offset = None
+
+    def mousePressEvent(self, event):
+        if event.button() == Qt.MouseButton.LeftButton and self.title_bar.underMouse():
+            self.dragging = True
+            self.offset = event.globalPosition().toPoint() - self.pos()
+
+    def mouseMoveEvent(self, event):
+        if self.dragging:
+            self.move(event.globalPosition().toPoint() - self.offset)
+
+    def mouseReleaseEvent(self, event):
+        if event.button() == Qt.MouseButton.LeftButton:
+            self.dragging = False
+
+    def mouseDoubleClickEvent(self, event):
+        if event.button() == Qt.MouseButton.LeftButton and self.title_bar.underMouse():
+            if self.isMaximized():
+                self.showNormal()
+            else:
+                self.showMaximized()
+
+    def create_icon_button(self, tooltip, icon_path, slot, layout, enable=True):
+        button = QPushButton()
+        button.setIcon(QIcon(icon_path))
+        button.setToolTip(tooltip)  
+        button.setFixedSize(40, 40)  
+        button.clicked.connect(slot)
+        button.setEnabled(enable)
+        button.setStyleSheet("""
+            QPushButton {
+                background-color: transparent;
+                border: none;
+                padding: 5px;
+            }
+            QPushButton:hover {
+                background-color: #4A4A4A;
+            }
+        """)
+        layout.addWidget(button)
+        return button
+
+    def inject_custom_css(self):
+        custom_css = """
+        #search {
+            background-color: #ffffff !important;
+            border: 2px solid #45a049 !important; 
+            border-radius: 25px !important; 
+            padding: 10px 40px 10px 40px !important; 
+            font-size: 16px !important; 
+            color: #333333 !important; 
+            outline: none !important; 
+            transition: border-color 0.3s ease !important; 
+        }
+
+        #search:focus {
+            border-color: #45a049 !important; 
+            box-shadow: 0 0 5px rgba(69, 160, 73, 0.5) !important; 
+        }
+
+        .relative .absolute svg {
+            color: #45a049 !important; 
+        }
+
+        .relative .absolute button {
+            background-color: transparent !important; 
+            border: none !important;
+            cursor: pointer !important; 
+        }
+
+        .relative .absolute button:hover {
+            background-color: rgba(69, 160, 73, 0.1) !important; 
+        }
+
+        #search::placeholder {
+            color: #999999 !important; 
+        }
+
+        .bg-flatpak-celestial-blue {
+            background-color: #45a049 !important; 
+            color: white !important; 
+            border-radius: 8px !important; 
+            padding: 10px 20px !important; 
+            font-size: 16px !important; 
+            font-weight: bold !important; 
+            border: none !important; 
+            cursor: pointer !important; 
+            text-align: center !important; 
+            text-decoration: none !important; 
+            display: inline-block !important; 
+            transition: background-color 0.3s ease !important; 
+        }
+
+        .bg-flatpak-celestial-blue:hover {
+            background-color: #4CAF50 !important; 
+        }
+
+        .bg-flatpak-celestial-blue:active {
+            background-color: #004080 !important; 
+        }
+        """
+        self.wview.page().runJavaScript(f"""
+            var style = document.createElement('style');
+            style.type = 'text/css';
+            style.innerHTML = `{custom_css}`;
+            document.head.appendChild(style);
+        """)
+
+    def show_about(self):
+        about_window = AboutDialog(self)
+        about_window.show()
+
+    def get_flatpak_version(self):
+        process = QProcess()
+        process.start("flatpak", ["--version"])
+        process.waitForFinished()
+        version = process.readAllStandardOutput().data().decode().strip()
+        version_number = version.replace("Flatpak", "").strip()
+        return version_number
+
+    def update_back_button(self, url):
+        self.button_back.setEnabled(self.wview.history().canGoBack() and url.toString() != 'https://flathub.org/es')
+
+    def go_home(self):
+        self.wview.load(QUrl('https://flathub.org/es'))
+        self.button_back.setEnabled(False)
+
+    def go_back(self):
+        if self.wview.history().canGoBack():
+            self.wview.back()
+            self.button_back.setEnabled(self.wview.url().toString() != 'https://flathub.org/es')
+        else:
+            self.button_back.setEnabled(False)
+
+    def show_installed_apps(self):
+        self.installed_apps_dialog = InstalledAppsDialog(self)
+        self.installed_apps_dialog.show()
+
+    def update_flatpaks(self):
+        self.update_process = QProcess()
+        self.output_window = CommandOutput(self.tr("Actualización en progreso..."), "", process=self.update_process, is_process=True, parent=self)
+        self.output_window.show()
+
+        self.update_process.setProcessChannelMode(QProcess.ProcessChannelMode.MergedChannels)
+        self.update_process.readyReadStandardOutput.connect(lambda: self.output_window.text_edit.append(self.update_process.readAllStandardOutput().data().decode()))
+        self.update_process.finished.connect(self.output_window.on_process_finished)
+        self.update_process.start("flatpak", ["update", "-y"])
+
+    def show_history(self):
+        process = QProcess()
+        process.start("flatpak", ["history"])
+        process.waitForFinished()
+        history_output = process.readAllStandardOutput().data().decode()
+
+        self.history_window = CommandOutput(self.tr("Historial de operaciones recientes"), history_output, parent=self)
+        self.history_window.show()
+
+    def repair_flatpak(self):
+        self.repair_process = QProcess()
+        self.output_window = CommandOutput(self.tr("Reparación en progreso..."), "", process=self.repair_process, is_process=True, parent=self)
+        self.output_window.show()
+
+        self.repair_process.setProcessChannelMode(QProcess.ProcessChannelMode.MergedChannels)
+        self.repair_process.readyReadStandardOutput.connect(lambda: self.output_window.text_edit.append(self.repair_process.readAllStandardOutput().data().decode()))
+        self.repair_process.finished.connect(self.output_window.on_process_finished)
+        self.repair_process.start("flatpak", ["repair"])
+
+    def install_local_flatpak(self):
+        file_dialog = QFileDialog(self)
+        file_dialog.setNameFilter("Flatpakref files (*.flatpakref)")
+        file_dialog.setFileMode(QFileDialog.FileMode.ExistingFile)
+
+        if file_dialog.exec():
+            flatpakref_path = file_dialog.selectedFiles()[0]
+
+            self.local_install_process = QProcess()
+            self.output_window = CommandOutput(self.tr("Instalación de paquete Flatpak en progreso..."), "", process=self.local_install_process, is_process=True, parent=self)
+            self.output_window.show()
+
+            self.local_install_process.setProcessChannelMode(QProcess.ProcessChannelMode.MergedChannels)  
+            self.local_install_process.readyReadStandardOutput.connect(self.read_process_output)  
+            self.local_install_process.finished.connect(self.on_install_finished) 
+
+            self.local_install_process.start('flatpak', ['install', '--system', '-y', flatpakref_path])
+
+            if not self.local_install_process.waitForStarted():
+                self.output_window.text_edit.append(self.tr("Error: No se pudo iniciar el proceso de instalación."))
+                return
+
+    def read_process_output(self):
+        if self.local_install_process:
+            output = self.local_install_process.readAllStandardOutput().data().decode()
+            if output:
+                self.output_window.text_edit.append(output)
+
+    def on_install_finished(self, exit_code, exit_status):
+        if self.local_install_process:
+            print(f"Proceso finalizado con código {exit_code} y estado {exit_status}")
+            if exit_status == QProcess.ExitStatus.NormalExit and exit_code == 0:
+                self.output_window.text_edit.append(self.tr("Instalación completada correctamente."))
+            else:
+                self.output_window.text_edit.append(self.tr("Proceso finalizado."))
+            self.output_window.switch_to_finalize_button()
+
+    def download_requested(self, download):
+        url = download.url().toString()
+        if url.endswith('.flatpakref'):
+            with urllib.request.urlopen(url) as response, tempfile.NamedTemporaryFile(suffix='.flatpakref', delete=False) as fp:
+                shutil.copyfileobj(response, fp)
+                fp.close()
+
+                self.process = QProcess()
+                self.output_window = CommandOutput(self.tr("Instalación de paquete Flatpak en progreso..."), "", process=self.process, is_process=True, parent=self)
+                self.output_window.show()
+
+                self.process.setProcessChannelMode(QProcess.ProcessChannelMode.MergedChannels)
+                self.process.readyReadStandardOutput.connect(lambda: self.output_window.text_edit.append(self.process.readAllStandardOutput().data().decode()))
+                self.process.finished.connect(self.output_window.on_process_finished)
+
+                self.process.start('flatpak', ['install', '--system', '-y', fp.name])
+
+                download.cancel()
+        elif not url.startswith('https://flathub.org/es'):
+            webbrowser.open(url, 2)
+            download.cancel()
+
+    def read_output(self):
+        text = bytes(self.process.readAllStandardOutput()).decode("utf-8")
+        self.output_window.append_output(text)
+
+def load_language_config():
+    config_path = QDir.homePath() + "/.flatpakui-config/config.json"
+    default_language = "es"
+    
+    try:
+        with open(config_path, "r") as config_file:
+            config = json.load(config_file)
+            language = config.get("language", default_language)
+            if language in ["es", "en", "pt"]:
+                return language
+            return default_language
+    except (FileNotFoundError, json.JSONDecodeError, KeyError):
+        print("No se pudo cargar el archivo de configuración. Usando idioma predeterminado.")
+        return default_language
+
+def load_translation(app, language_code):
+    translator = QTranslator()
+    possible_paths = [
+        f"{translation_path}/ts_flatpak-store-ui_{language_code}.qm",
+        QDir.homePath() + f"/.local/share/flatpak-store-ui/translations/ts_flatpak-store-ui_{language_code}.qm",
+        f"/usr/local/share/flatpak-store-ui/translations/ts_flatpak-store-ui_{language_code}.qm"
+    ]
+    
+    for path in possible_paths:
+        if translator.load(path):
+            app.installTranslator(translator)
+            print(f"Traducción cargada desde: {path}")
+            return True
+    
+    print(f"Advertencia: No se encontró el archivo de traducción para '{language_code}'")
+    return False
+
+if __name__ == "__main__":
+    app = QApplication(sys.argv)    
+
+    app.setStyleSheet("""
+        QToolTip {
+            color: white;
+            background-color: #333;
+            border: 1px solid #444;
+        }
+    """)
+    
+    language = load_language_config()
+    
+    if not load_translation(app, language):
+        system_language = QLocale.system().name()[0:2]
+        if system_language != language and system_language in ["es", "en", "pt"]:
+            load_translation(app, system_language)
+    
+    main_window = PythonWebView()
+    main_window.show()
+    sys.exit(app.exec())

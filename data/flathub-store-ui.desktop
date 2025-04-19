@@ -1,8 +1,9 @@
 [Desktop Entry]
-Name=Flathub Store
-Comment=Tienda Flathub para la instalacion de programas flatpak de forma simple.
-Exec=/usr/bin/python3 /usr/bin/flathub-store-ui
-Icon=/usr/share/icons/hicolor/scalable/apps/flathub-store-ui.svg
-StartupWMClass=flathub-store-ui
-Type=Application
 Categories=System;
+Comment=Tienda Flatpak para la instalacion de programas de forma simple.
+Exec=/usr/bin/python3 /usr/bin/flatpak-store-ui
+Icon=/usr/share/icons/hicolor/scalable/apps/flatpak-store-ui.svg
+Name=Flatpak Store
+StartupWMClass=flatpak-store-ui
+Type=Application
+X-Deepin-Vendor=user-custom

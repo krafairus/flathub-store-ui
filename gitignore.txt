@@ -12,5 +12,5 @@ dist
 .tar.gz
 *.deb
 .asc
-debian/flathub-store-ui
+debian/flatpak-store-ui
 debian/files

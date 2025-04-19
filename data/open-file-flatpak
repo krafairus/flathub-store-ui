@@ -8,14 +8,14 @@ from PyQt5.QtWidgets import (
 from PyQt5.QtCore import QProcess, Qt, QDir, QTranslator
 from PyQt5.QtGui import QIcon
 
-translation_path = "/usr/share/flathub-store-ui/translations"
+translation_path = "/usr/share/flatpak-store-ui/translations"
 
 class GPGKeyDialog(QDialog):
     def __init__(self, gpg_key, parent=None):
         super().__init__(parent)
         self.setWindowTitle(self.tr("Clave GPG"))
         self.setFixedSize(400, 300)
-        self.setWindowIcon(QIcon('/usr/share/icons/hicolor/scalable/apps/flathub-store-ui'))
+        self.setWindowIcon(QIcon('/usr/share/icons/hicolor/scalable/apps/flatpak-store-ui.svg'))
 
         layout = QVBoxLayout(self)
 
@@ -180,7 +180,7 @@ class FlatpakInstaller(QWidget):
     def initUI(self):
         self.setWindowTitle(self.tr('Instalador de Flatpak')) 
         self.setMinimumSize(400, 400)
-        self.setWindowIcon(QIcon('/usr/share/icons/hicolor/scalable/apps/flathub-store-ui'))
+        self.setWindowIcon(QIcon('/usr/share/icons/hicolor/scalable/apps/flatpak-store-ui.svg'))
 
         self.setWindowFlags(Qt.FramelessWindowHint)
 
@@ -410,7 +410,7 @@ class FlatpakInstaller(QWidget):
                 self.showMaximized()
 
     def load_language_config(self):
-        config_path = QDir.homePath() + "/.flathubui-config/config.json"
+        config_path = QDir.homePath() + "/.flatpakui-config/config.json"
         try:
             with open(config_path, "r") as config_file:
                 config = json.load(config_file)

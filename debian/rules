@@ -18,7 +18,7 @@ clean:
 	rm -f build-stamp
 	dh_clean
 
-DESTDIR = $(CURDIR)/debian/flathub-store-ui
+DESTDIR = $(CURDIR)/debian/flatpak-store-ui
 
 install: build
 	dh_testdir
@@ -26,24 +26,24 @@ install: build
 	dh_prep
 	dh_installdirs
 
-	# Add here commands to install the package into flathub-store-ui.
+	# Add here commands to install the package into flatpak-store-ui.
 	install -d $(DESTDIR)/usr/bin
-	install -m 755 flathub-store-ui $(DESTDIR)/usr/bin
-	install -d $(DESTDIR)/usr/share/flathub-store-ui/icons
-	install -m 644 icons/*.png $(DESTDIR)/usr/share/flathub-store-ui/icons
-	install -m 644 icons/com.github.tchx84.Flatseal.svg $(DESTDIR)/usr/share/flathub-store-ui/icons
-	install -d $(DESTDIR)/usr/share/flathub-store-ui/translations
-	install -m 644 translations/*.qm $(DESTDIR)/usr/share/flathub-store-ui/translations
+	install -m 755 flatpak-store-ui $(DESTDIR)/usr/bin
+	install -d $(DESTDIR)/usr/share/flatpak-store-ui/icons
+	install -m 644 icons/*.png $(DESTDIR)/usr/share/flatpak-store-ui/icons
+	install -m 644 icons/com.github.tchx84.Flatseal.svg $(DESTDIR)/usr/share/flatpak-store-ui/icons
+	install -d $(DESTDIR)/usr/share/flatpak-store-ui/translations
+	install -m 644 translations/*.qm $(DESTDIR)/usr/share/flatpak-store-ui/translations
 	install -d $(DESTDIR)/usr/share/applications
-	install -m 644 data/flathub-store-ui.desktop $(DESTDIR)/usr/share/applications/
+	install -m 644 data/flatpak-store-ui.desktop $(DESTDIR)/usr/share/applications/
 	install -d $(DESTDIR)/usr/share/applications
 	install -m 644 data/open-file-flatpak.desktop $(DESTDIR)/usr/share/applications/
 	install -d $(DESTDIR)/usr/share/icons/hicolor/scalable/apps
-	install -m 644 data/flathub-store-ui.svg $(DESTDIR)/usr/share/icons/hicolor/scalable/apps/
-	install -d $(DESTDIR)/usr/share/flathub-store-ui
-	install -m 755 data/flathub-store-ui $(DESTDIR)/usr/share/flathub-store-ui/
-	install -d $(DESTDIR)/usr/share/flathub-store-ui
-	install -m 755 data/open-file-flatpak $(DESTDIR)/usr/share/flathub-store-ui/
+	install -m 644 data/flatpak-store-ui.svg $(DESTDIR)/usr/share/icons/hicolor/scalable/apps/
+	install -d $(DESTDIR)/usr/share/flatpak-store-ui
+	install -m 755 data/flatpak-store-ui $(DESTDIR)/usr/share/flatpak-store-ui/
+	install -d $(DESTDIR)/usr/share/flatpak-store-ui
+	install -m 755 data/open-file-flatpak $(DESTDIR)/usr/share/flatpak-store-ui/
 
 # Build architecture-independent files here.
 binary-indep: build install
