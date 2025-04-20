@@ -15,6 +15,10 @@ The Arch/Manjaro package will be available soon.
 
 (in progress) I will soon finish implementing the translations. Although the loading of translations and other tools has already been implemented, I plan to improve the process so that I don't have to translate the entire program bit by bit, and that it is done automatically.
 
+(Improvement - Not guaranteed) Improve the installed applications management window to better integrate with the new capability that will allow CSS injection into the install button within the website.
+
+(Change) Detect if a program is already installed and inject CSS to change the install button to uninstall within the website as well as its color, also improve the installation logic so that if the program is already installed then the second execution of the button starts the uninstallation.
+
 (Features) I will add new features to further integrate Flatpak options graphically.
 
 (Package) Create a Flatpak package and upload it to Flathub to make it more accessible from other distributions.
